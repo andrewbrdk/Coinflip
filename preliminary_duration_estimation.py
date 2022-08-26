@@ -308,4 +308,5 @@ st.plotly_chart(fig)
 
 #todo: make simulations plots readable or remove them
 st.markdown('---')
+st.write("Get the sources at https://github.com/noooway/Coinflip")
 st.write("See theory explanation at https://github.com/noooway/Bayesian_ab_testing")
