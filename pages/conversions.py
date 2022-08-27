@@ -10,6 +10,37 @@ import streamlit as st
 #rng = default_rng(17)
 np.random.seed(7)   
 
+def posterior_for_binom_and_uniform_prior(p, n_heads, n_trials):
+    alpha_prior = 1
+    beta_prior = 1
+    alpha_post = alpha_prior + n_heads
+    beta_post = beta_prior + (n_trials - n_heads)
+    return stats.beta.pdf(p, alpha_post, beta_post)
+
+def hpdi_for_binom_and_uniform_prior(hpdi, n_heads, n_trials):
+    #todo: switch to built-in quantile functions?
+    p_grid = np.linspace(start=0, stop=1, num=3001)
+    p_posterior = np.array([posterior_for_binom_and_uniform_prior(p, n_heads, n_trials) for p in p_grid])
+    norm = np.sum(p_posterior)
+    n_start = np.argmax(p_posterior)
+    n_left = n_start
+    n_right = n_start
+    s = p_posterior[n_start]
+    while s < hpdi * norm:
+        next_left = p_posterior[n_left - 1]
+        next_right = p_posterior[n_right + 1]
+        if next_left > next_right:
+            n_left = n_left - 1
+            s = s + next_left
+        elif next_left < next_right:
+            n_right = n_right + 1
+            s = s + next_right
+        else:
+            n_left = n_left - 1
+            n_right = n_right + 1
+            s = s + next_left + next_right
+    return(p_grid[n_left], p_grid[n_right])
+
 def init_conv_session_values():
     if 'conv_a_exact' not in st.session_state:
         st.session_state['conv_a_exact'] = 15.0
@@ -121,14 +152,64 @@ st.plotly_chart(fig)
 df_accum = df.groupby('group')[['n_users', 'conv']].cumsum().rename(columns={'n_users': 'n_users_accum', 'conv':'conv_accum'})
 df = pd.concat([df, df_accum], axis=1)
 df['p_accum'] = df['conv_accum'] / df['n_users_accum']
-fig = px.line(df, x='day', y='p_accum', color='group', markers=True)
-fig.update_layout(yaxis_rangemode='tozero')
-st.plotly_chart(fig)
+
+
+with st.spinner(text=f'Computing Conversions Interval Estimates ...'):
+    hpdi = 0.9
+    df[['p_hpdi_lower','p_hpdi_higher']] = df.apply(lambda row: pd.Series(hpdi_for_binom_and_uniform_prior(hpdi, row['conv_accum'], row['n_users_accum'])), axis=1)
+    df['error_lower'] = df['p_accum'] - df['p_hpdi_lower']
+    df['error_higher'] = df['p_hpdi_higher'] - df['p_accum']
+    #display(df.head())
+
+    #fig = px.line(df, x='day', y='p_accum', color='group', markers=True)
+    #fig.update_layout(yaxis_rangemode='tozero')
+    fig = go.Figure()
+    col = 'blue'
+    fig.add_trace(go.Scatter(x=df[df['group'] == 'A']['day'], 
+                            y=df[df['group'] == 'A']['p_accum'],
+                            mode='lines+markers', name='A', line_color=col))
+    fig.add_trace(go.Scatter(x=pd.concat([df[df['group'] == 'A']['day'], df[df['group'] == 'A']['day'][::-1], df[df['group'] == 'A']['day'][0:1]]), 
+                            y=pd.concat([df[df['group'] == 'A']['p_hpdi_higher'], df[df['group'] == 'A']['p_hpdi_lower'][::-1], df[df['group'] == 'A']['p_hpdi_higher'][0:1]]),
+                            fill='toself', name=f'{hpdi:.0%} HPDI A',
+                            hoveron = 'points+fills',
+                            hoverinfo = 'text+x+y',
+                            line_color=col, fillcolor=col, opacity=0.4))
+    col = 'red'
+    fig.add_trace(go.Scatter(x=df[df['group'] == 'B']['day'], 
+                            y=df[df['group'] == 'B']['p_accum'],
+                            mode='lines+markers', name='B', line_color=col))
+    fig.add_trace(go.Scatter(x=pd.concat([df[df['group'] == 'B']['day'], df[df['group'] == 'B']['day'][::-1], df[df['group'] == 'B']['day'][0:1]]), 
+                            y=pd.concat([df[df['group'] == 'B']['p_hpdi_higher'], df[df['group'] == 'B']['p_hpdi_lower'][::-1], df[df['group'] == 'B']['p_hpdi_higher'][0:1]]),
+                            fill='toself', name=f'{hpdi:.0%} HPDI B',
+                            hoveron = 'points+fills',
+                            hoverinfo = 'text+x+y',
+                            line_color=col, fillcolor=col, opacity=0.4))
+    fig.update_layout(
+        title='Accumulated Conversions',
+        xaxis_title='Days',
+        yaxis_title='P',
+        yaxis_rangemode='tozero',
+        hovermode="x")
+    fig.update_layout(height=470)
+    st.plotly_chart(fig)
+
 
 
 st.subheader("Conversions Prob Density Estimates")
 
+p_grid = np.linspace(start=0, stop=1, num=3001)
+p_posterior_a = np.array([posterior_for_binom_and_uniform_prior(p, df[df['group'] == 'A']['conv_accum'].iloc[-1], df[df['group'] == 'A']['n_users_accum'].iloc[-1]) for p in p_grid])
+p_posterior_b = np.array([posterior_for_binom_and_uniform_prior(p, df[df['group'] == 'B']['conv_accum'].iloc[-1], df[df['group'] == 'B']['n_users_accum'].iloc[-1]) for p in p_grid])
 
+fig = go.Figure()
+fig.add_trace(go.Scatter(x=p_grid, y=p_posterior_a, mode='lines', name='A', line_color='blue'))
+fig.add_trace(go.Scatter(x=p_grid, y=p_posterior_b, mode='lines', name='B', line_color='red'))
+fig.update_layout(title='Posterior',
+                  xaxis_title='p',
+                  yaxis_title='Prob Density',
+                  hovermode="x")
+#fig.update_layout(xaxis_range=[0, 0.1])
+st.plotly_chart(fig)
 
 
 st.markdown('---')
