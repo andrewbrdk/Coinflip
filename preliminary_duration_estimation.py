@@ -105,13 +105,13 @@ with col1:
     st.number_input(label='A Mean, %',
                     min_value=0.0,
                     max_value=100.0,
-                    value=st.session_state['a_mean'],
+                    #value=st.session_state['a_mean'],
                     step=0.1,
                     format='%f',
                     key='a_mean')
     st.number_input(label='A Std, %',
                     min_value=0.01,
-                    value=st.session_state['a_std'],
+                    #value=st.session_state['a_std'],
                     step=0.01,
                     format='%f',
                     key='a_std')
@@ -120,13 +120,13 @@ with col2:
     st.number_input(label='B Mean, %',
                     min_value=0.0,
                     max_value=100.0,
-                    value=st.session_state['b_mean'],
+                    #value=st.session_state['b_mean'],
                     step=0.1,
                     format='%f',
                     key='b_mean')
     st.number_input(label='B Std, %',
                     min_value=0.01,
-                    value=st.session_state['b_std'],
+                    #value=st.session_state['b_std'],
                     step=0.01,
                     format='%f',
                     key='b_std')
@@ -162,7 +162,7 @@ st.subheader("Simulations")
 
 st.number_input(label='B Group Traffic Part, %',
                 min_value=0.0,
-                value=st.session_state['b_split'],
+                #value=st.session_state['b_split'],
                 step=1.0,
                 format='%f',
                 key='b_split')
@@ -172,21 +172,21 @@ col1, col2 = st.columns(2)
 with col1: 
     st.number_input(label='Max N in Simulations',
                     min_value=5000,
-                    value=st.session_state['sim_max'],
+                    #value=st.session_state['sim_max'],
                     step=5000,
                     format='%d',
                     key='sim_max')
 with col2: 
     st.number_input(label='N Step in Simulations',
                     min_value=1000,
-                    value=st.session_state['sim_step'],
+                    #value=st.session_state['sim_step'],
                     step=1000,
                     format='%d',
                     key='sim_step')
 
 n_simulations = st.number_input(label='Simulations',
                                 min_value=1,
-                                value=st.session_state['n_simulations'],
+                                #value=st.session_state['n_simulations'],
                                 step=1,
                                 format='%d',
                                 key='n_simulations')
@@ -235,7 +235,7 @@ st.subheader("Duration Estimate for $P(p_B \ge p_A) = x$")
 
 pb_gt_pa_required = st.number_input(label='Required P(p_B > p_A)',
                                     min_value=0.0,
-                                    value=st.session_state['pb_gt_pa_required'],
+                                    #value=st.session_state['pb_gt_pa_required'],
                                     step=1.0,
                                     format='%f',
                                     key='pb_gt_pa_required')
@@ -273,7 +273,7 @@ st.subheader("Duration Estimate for Maximum Expected Conversions")
 
 st.number_input(label='Total Affected Users',
                 min_value=1000,
-                value=st.session_state['n_total_affected'],
+                #value=st.session_state['n_total_affected'],
                 step=1000,
                 format='%d',
                 key='n_total_affected')
