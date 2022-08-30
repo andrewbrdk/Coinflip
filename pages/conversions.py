@@ -197,63 +197,57 @@ summary_container = st.container()
 
 st.subheader("Details")
 
-# st.subheader("Traffic Split")
-
-# fig = px.line(df, x='day', y='n_users', color='group', markers=True)
-# fig.update_layout(yaxis_rangemode='tozero')
-# st.plotly_chart(fig)
-
-df_accum2 = df.groupby(['group'], as_index=False)[['n_users', 'conv']].sum()
-# fig = px.bar(df_accum2, x='group', y='n_users', color='group')
-# st.plotly_chart(fig)
-
-df_summary = df_accum2.copy().set_index('group')
+df_summary = df_exp.groupby(['group'])[['n_users', 'conv']].sum()
 df_summary['p'] = df_summary['conv'] / df_summary['n_users']
+df_summary['col'] = pd.Series({'A': 'red', 'B':'blue'})
 summary_container.write(df_summary)
 
+df_plot = df_exp.set_index('group')
 
 fig = make_subplots(rows=1, cols=2, 
                     column_widths=[0.75, 0.25],
-                    subplot_titles=("Daily Users", "Total Users"))
-df_plot = df_exp.copy()
-df_plot['col'] = df_exp['group'].apply(lambda gr: 'red' if gr == 'A' else 'blue')
-df_plot = df_plot.set_index('group')
-col = 'red'
-fig.add_trace(
-    go.Scatter(x=df_plot['day']['A'], y=df_plot['n_users']['A'], 
-               line_color=col,
-               name='A'),
-    row=1, col=1
-)
-fig.add_trace(
-    go.Bar(x=['A'], y=[df_summary['n_users']['A']], marker_color=col, name='A'),
-    row=1, col=2
-)
-col = 'blue'
-fig.add_trace(
-    go.Scatter(x=df_plot['day']['B'], y=df_plot['n_users']['B'],
-               line_color=col,
-               name='B'),
-    row=1, col=1
-)
-fig.add_trace(
-    go.Bar(x=['B'], y=[df_summary['n_users']['B']], marker_color=col, name='B'),
-    row=1, col=2
-)
-#fig.update_layout(height=500, width=800)
-fig.update_layout(title_text='Traffic Split')
+                    subplot_titles=("Daily", "Total"))
+for gr in df_plot.index.unique():
+    fig.add_trace(
+        go.Scatter(x=df_plot['day'][gr], y=df_plot['n_users'][gr], 
+                   line_color=df_summary['col'][gr],
+                   name=gr),
+        row=1, col=1
+    )
+    fig.add_trace(
+        go.Bar(x=[gr], y=[df_summary['n_users'][gr]],
+               marker_color=df_summary['col'][gr],
+               name=gr),
+        row=1, col=2
+    )
+fig.update_layout(title_text='Total Users')
 fig.update_xaxes(title_text="Days", row=1, col=1)
 fig.update_yaxes(title_text="N Users", row=1, col=1)
 fig.update_xaxes(title_text="Groups", row=1, col=2)
-fig.update_yaxes(title_text="N Users", row=1, col=2)
 fig.update_layout(yaxis_rangemode='tozero')
 st.plotly_chart(fig)
 
 
-st.subheader("Daily Conversions")
-
-df['p_daily'] = df['conv'] / df['n_users']
-fig = px.line(df, x='day', y='p_daily', color='group', markers=True)
+fig = make_subplots(rows=1, cols=2, 
+                    column_widths=[0.75, 0.25],
+                    subplot_titles=("Daily", "Total"))
+for gr in df_plot.index.unique():
+    fig.add_trace(
+        go.Scatter(x=df_plot['day'][gr], y=df_plot['conv'][gr], 
+                   line_color=df_summary['col'][gr],
+                   name=gr),
+        row=1, col=1
+    )
+    fig.add_trace(
+        go.Bar(x=[gr], y=[df_summary['conv'][gr]],
+               marker_color=df_summary['col'][gr],
+               name=gr),
+        row=1, col=2
+    )
+fig.update_layout(title_text='Converted Users')
+fig.update_xaxes(title_text="Days", row=1, col=1)
+fig.update_yaxes(title_text="N Converted", row=1, col=1)
+fig.update_xaxes(title_text="Groups", row=1, col=2)
 fig.update_layout(yaxis_rangemode='tozero')
 st.plotly_chart(fig)
 
@@ -261,7 +255,6 @@ st.plotly_chart(fig)
 df_accum = df.groupby('group')[['n_users', 'conv']].cumsum().rename(columns={'n_users': 'n_users_accum', 'conv':'conv_accum'})
 df = pd.concat([df, df_accum], axis=1)
 df['p_accum'] = df['conv_accum'] / df['n_users_accum']
-
 
 with st.spinner(text=f'Computing Conversions Interval Estimates ...'):
     hpdi = 0.9
