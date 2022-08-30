@@ -195,19 +195,60 @@ st.subheader("Results")
 
 summary_container = st.container()
 
-st.subheader("Traffic Split")
+st.subheader("Details")
 
-fig = px.line(df, x='day', y='n_users', color='group', markers=True)
-fig.update_layout(yaxis_rangemode='tozero')
-st.plotly_chart(fig)
+# st.subheader("Traffic Split")
+
+# fig = px.line(df, x='day', y='n_users', color='group', markers=True)
+# fig.update_layout(yaxis_rangemode='tozero')
+# st.plotly_chart(fig)
 
 df_accum2 = df.groupby(['group'], as_index=False)[['n_users', 'conv']].sum()
-fig = px.bar(df_accum2, x='group', y='n_users', color='group')
-st.plotly_chart(fig)
+# fig = px.bar(df_accum2, x='group', y='n_users', color='group')
+# st.plotly_chart(fig)
 
 df_summary = df_accum2.copy().set_index('group')
 df_summary['p'] = df_summary['conv'] / df_summary['n_users']
 summary_container.write(df_summary)
+
+
+fig = make_subplots(rows=1, cols=2, 
+                    column_widths=[0.75, 0.25],
+                    subplot_titles=("Daily Users", "Total Users"))
+df_plot = df_exp.copy()
+df_plot['col'] = df_exp['group'].apply(lambda gr: 'red' if gr == 'A' else 'blue')
+df_plot = df_plot.set_index('group')
+col = 'red'
+fig.add_trace(
+    go.Scatter(x=df_plot['day']['A'], y=df_plot['n_users']['A'], 
+               line_color=col,
+               name='A'),
+    row=1, col=1
+)
+fig.add_trace(
+    go.Bar(x=['A'], y=[df_summary['n_users']['A']], marker_color=col, name='A'),
+    row=1, col=2
+)
+col = 'blue'
+fig.add_trace(
+    go.Scatter(x=df_plot['day']['B'], y=df_plot['n_users']['B'],
+               line_color=col,
+               name='B'),
+    row=1, col=1
+)
+fig.add_trace(
+    go.Bar(x=['B'], y=[df_summary['n_users']['B']], marker_color=col, name='B'),
+    row=1, col=2
+)
+#fig.update_layout(height=500, width=800)
+fig.update_layout(title_text='Traffic Split')
+fig.update_xaxes(title_text="Days", row=1, col=1)
+fig.update_yaxes(title_text="N Users", row=1, col=1)
+fig.update_xaxes(title_text="Groups", row=1, col=2)
+fig.update_yaxes(title_text="N Users", row=1, col=2)
+fig.update_layout(yaxis_rangemode='tozero')
+st.plotly_chart(fig)
+
 
 st.subheader("Daily Conversions")
 
