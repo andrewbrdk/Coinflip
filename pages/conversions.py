@@ -287,7 +287,7 @@ with st.spinner(text=f'Computing Conversions Interval Estimates ...'):
                             hoverinfo = 'text+x+y',
                             line_color=col, fillcolor=col, opacity=0.4))
     fig.update_layout(
-        title='Accumulated Conversions',
+        title='Conversions on Accumulated Data',
         xaxis_title='Days',
         yaxis_title='P',
         yaxis_rangemode='tozero',
