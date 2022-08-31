@@ -39,7 +39,7 @@ def hpdi_for_binom_and_uniform_prior(hpdi, n_heads, n_trials):
             n_left = n_left - 1
             n_right = n_right + 1
             s = s + next_left + next_right
-    return(p_grid[n_left], p_grid[n_right])
+    return (p_grid[n_left], p_grid[n_right])
 
 def posterior_sample_for_binom_and_uniform_prior(ns, ntotal, n_sample):
     alpha_prior = 1
@@ -51,7 +51,12 @@ def posterior_sample_for_binom_and_uniform_prior(ns, ntotal, n_sample):
 def alpha_beta_post(alpha, beta, n_conv, n_total):
     alpha_post = alpha + n_conv
     beta_post = beta + (n_total - n_conv)
-    return alpha_post, beta_post 
+    return alpha_post, beta_post
+
+def beta_post_dist(alpha, beta, n_conv, n_total):
+    alpha_post = alpha + n_conv
+    beta_post = beta + (n_total - n_conv)
+    return stats.beta(a=alpha_post, b=beta_post)
 
 def prob_pb_gt_pa(p_a, p_b, N_a, N_b = None):
     N_b = N_a if N_b is None else N_b
@@ -205,7 +210,7 @@ summary_container.write(df_summary)
 df_plot = df_exp.set_index('group')
 
 fig = make_subplots(rows=1, cols=2, 
-                    column_widths=[0.75, 0.25],
+                    column_widths=[0.85, 0.15],
                     subplot_titles=("Daily", "Total"))
 for gr in df_plot.index.unique():
     fig.add_trace(
@@ -229,7 +234,7 @@ st.plotly_chart(fig)
 
 
 fig = make_subplots(rows=1, cols=2, 
-                    column_widths=[0.75, 0.25],
+                    column_widths=[0.85, 0.15],
                     subplot_titles=("Daily", "Total"))
 for gr in df_plot.index.unique():
     fig.add_trace(
@@ -261,55 +266,71 @@ with st.spinner(text=f'Computing Conversions Interval Estimates ...'):
     df[['p_hpdi_lower','p_hpdi_higher']] = df.apply(lambda row: pd.Series(hpdi_for_binom_and_uniform_prior(hpdi, row['conv_accum'], row['n_users_accum'])), axis=1)
     df['error_lower'] = df['p_accum'] - df['p_hpdi_lower']
     df['error_higher'] = df['p_hpdi_higher'] - df['p_accum']
-    #display(df.head())
 
-    #fig = px.line(df, x='day', y='p_accum', color='group', markers=True)
-    #fig.update_layout(yaxis_rangemode='tozero')
-    fig = go.Figure()
-    col = 'blue'
-    fig.add_trace(go.Scatter(x=df[df['group'] == 'A']['day'], 
-                            y=df[df['group'] == 'A']['p_accum'],
-                            mode='lines+markers', name='A', line_color=col))
-    fig.add_trace(go.Scatter(x=pd.concat([df[df['group'] == 'A']['day'], df[df['group'] == 'A']['day'][::-1], df[df['group'] == 'A']['day'][0:1]]), 
-                            y=pd.concat([df[df['group'] == 'A']['p_hpdi_higher'], df[df['group'] == 'A']['p_hpdi_lower'][::-1], df[df['group'] == 'A']['p_hpdi_higher'][0:1]]),
-                            fill='toself', name=f'{hpdi:.0%} HPDI A',
-                            hoveron = 'points+fills',
-                            hoverinfo = 'text+x+y',
-                            line_color=col, fillcolor=col, opacity=0.4))
-    col = 'red'
-    fig.add_trace(go.Scatter(x=df[df['group'] == 'B']['day'], 
-                            y=df[df['group'] == 'B']['p_accum'],
-                            mode='lines+markers', name='B', line_color=col))
-    fig.add_trace(go.Scatter(x=pd.concat([df[df['group'] == 'B']['day'], df[df['group'] == 'B']['day'][::-1], df[df['group'] == 'B']['day'][0:1]]), 
-                            y=pd.concat([df[df['group'] == 'B']['p_hpdi_higher'], df[df['group'] == 'B']['p_hpdi_lower'][::-1], df[df['group'] == 'B']['p_hpdi_higher'][0:1]]),
-                            fill='toself', name=f'{hpdi:.0%} HPDI B',
-                            hoveron = 'points+fills',
-                            hoverinfo = 'text+x+y',
-                            line_color=col, fillcolor=col, opacity=0.4))
-    fig.update_layout(
-        title='Conversions on Accumulated Data',
-        xaxis_title='Days',
-        yaxis_title='P',
-        yaxis_rangemode='tozero',
-        hovermode="x")
-    fig.update_layout(height=470)
+    df_plot = df.set_index('group')
+    df_summary[['p_error_lower', 'p_error_higher']] = df_plot[['error_lower', 'error_higher']][df_plot['day'] == df_plot['day'].max()]
+
+    fig = make_subplots(rows=1, cols=2, 
+                        shared_yaxes=True,
+                        column_widths=[0.85, 0.15],
+                        subplot_titles=("Daily", "Total"))
+
+    for gr in df_plot.index.unique():
+        fig.add_trace(
+            go.Scatter(x=df_plot['day'][gr], y=df_plot['p_accum'][gr],
+                       line_color=df_summary['col'][gr],
+                       name=gr),
+            row=1, col=1)
+        fig.add_trace(
+            go.Scatter(x=pd.concat([df_plot['day'][gr], df_plot['day'][gr][::-1], df_plot['day'][gr][0:1]]),
+                       y=pd.concat([df_plot['p_hpdi_higher'][gr], df_plot['p_hpdi_lower']
+                                    [gr][::-1], df_plot['p_hpdi_higher'][gr][0:1]]),
+                       fill='toself', name=f'{hpdi:.0%} HPDI A',
+                       hoveron='points+fills',
+                       hoverinfo='text+x+y',
+                       line_color=df_summary['col'][gr], fillcolor=df_summary['col'][gr], opacity=0.4),
+            row=1, col=1)
+        fig.add_trace(
+            go.Scatter(x=[gr], y=[df_summary['p'][gr]],
+                       marker_color=df_summary['col'][gr],
+                       error_y={'array': [df_summary['p_error_higher'][gr]],
+                                'arrayminus': [df_summary['p_error_lower'][gr]]},
+                       name=gr),
+            row=1, col=2)
+
+    fig.update_layout(title_text='Accumulated Conversions')
+    fig.update_xaxes(title_text="Days", row=1, col=1)
+    fig.update_yaxes(title_text="Conversions", row=1, col=1)
+    fig.update_xaxes(title_text="Groups", row=1, col=2)
+    fig.update_layout(yaxis_rangemode='tozero', yaxis2_rangemode='tozero')
     st.plotly_chart(fig)
 
 
-
-st.subheader("Conversions Prob Density Estimates")
 
 p_grid = np.linspace(start=0, stop=1, num=3001)
 p_posterior_a = np.array([posterior_for_binom_and_uniform_prior(p, df[df['group'] == 'A']['conv_accum'].iloc[-1], df[df['group'] == 'A']['n_users_accum'].iloc[-1]) for p in p_grid])
 p_posterior_b = np.array([posterior_for_binom_and_uniform_prior(p, df[df['group'] == 'B']['conv_accum'].iloc[-1], df[df['group'] == 'B']['n_users_accum'].iloc[-1]) for p in p_grid])
 
 fig = go.Figure()
-fig.add_trace(go.Scatter(x=p_grid, y=p_posterior_a, mode='lines', name='A', line_color='blue'))
-fig.add_trace(go.Scatter(x=p_grid, y=p_posterior_b, mode='lines', name='B', line_color='red'))
-fig.update_layout(title='Posterior',
+fig.add_trace(go.Scatter(x=p_grid, y=p_posterior_a, mode='lines',
+                         name='A', 
+                         line_color=df_summary['col']['A']))
+fig.add_trace(go.Scatter(x=p_grid, y=p_posterior_b, mode='lines',
+                         name='B', 
+                         line_color=df_summary['col']['B']))
+fig.update_layout(title='Conversions Prob Density Estimates',
                   xaxis_title='p',
                   yaxis_title='Prob Density',
                   hovermode="x")
+
+a_post_dist = beta_post_dist(alpha=1, beta=1, n_conv=df_summary['conv']['A'], n_total=df_summary['n_users']['A'])
+b_post_dist = beta_post_dist(alpha=1, beta=1, n_conv=df_summary['conv']['B'], n_total=df_summary['n_users']['B'])
+#todo: use floor, ceil
+xaxis_min = np.round(np.min([a_post_dist.mean() - 5 * a_post_dist.std(),
+                             b_post_dist.mean() - 5 * b_post_dist.std()]), 2)
+xaxis_max = np.round(np.max([a_post_dist.mean() + 5 * a_post_dist.std(),
+                             b_post_dist.mean() + 5 * b_post_dist.std()]), 2)
+fig.update_layout(xaxis_range=[xaxis_min, xaxis_max])
 #fig.update_layout(xaxis_range=[0, 0.1])
 st.plotly_chart(fig)
 
