@@ -192,20 +192,28 @@ df_exp = pd.concat([
                   'n_users': b_trials,
                   'conv': b_trials_conv})
 ])
-st.write(df_exp)
+st.dataframe(df_exp, height=200)
 
 df = df_exp.copy()
 
 st.subheader("Results")
 
 summary_container = st.container()
+summary_bar = summary_container.progress(0)
 
 st.subheader("Details")
 
 df_summary = df_exp.groupby(['group'])[['n_users', 'conv']].sum()
 df_summary['p'] = df_summary['conv'] / df_summary['n_users']
 df_summary['col'] = pd.Series({'A': 'red', 'B':'blue'})
-summary_container.write(df_summary)
+
+df_formatted = df_summary[[]].copy()
+df_formatted['Total Users'] = df_summary['n_users'].astype(str)
+df_formatted['Converted Users'] = df_summary['conv'].astype(str)
+df_formatted['p, %'] = (df_summary['p'] * 100).round(1).astype(str)
+
+summary_bar.progress(0.1)
+#summary_container.write(df_formatted.T)
 
 df_plot = df_exp.set_index('group')
 
@@ -305,33 +313,31 @@ with st.spinner(text=f'Computing Conversions Interval Estimates ...'):
     fig.update_layout(yaxis_rangemode='tozero', yaxis2_rangemode='tozero')
     st.plotly_chart(fig)
 
+summary_bar.progress(0.6)
+
 
 
 p_grid = np.linspace(start=0, stop=1, num=3001)
-p_posterior_a = np.array([posterior_for_binom_and_uniform_prior(p, df[df['group'] == 'A']['conv_accum'].iloc[-1], df[df['group'] == 'A']['n_users_accum'].iloc[-1]) for p in p_grid])
-p_posterior_b = np.array([posterior_for_binom_and_uniform_prior(p, df[df['group'] == 'B']['conv_accum'].iloc[-1], df[df['group'] == 'B']['n_users_accum'].iloc[-1]) for p in p_grid])
-
+xaxis_min = np.nan
+xaxis_max = np.nan
 fig = go.Figure()
-fig.add_trace(go.Scatter(x=p_grid, y=p_posterior_a, mode='lines',
-                         name='A', 
-                         line_color=df_summary['col']['A']))
-fig.add_trace(go.Scatter(x=p_grid, y=p_posterior_b, mode='lines',
-                         name='B', 
-                         line_color=df_summary['col']['B']))
+for gr in df_summary.index.unique():
+    post_dist = beta_post_dist(alpha=1, beta=1,
+                               n_conv=df_summary['conv'][gr],
+                               n_total=df_summary['n_users'][gr])
+    y_plot = post_dist.pdf(p_grid)
+    fig.add_trace(go.Scatter(x=p_grid, y=y_plot, mode='lines',
+                             name=gr,
+                             line_color=df_summary['col'][gr]))
+    xaxis_min = np.nanmin([xaxis_min, post_dist.mean() - 5 * post_dist.std()])
+    xaxis_max = np.nanmax([xaxis_max, post_dist.mean() + 5 * post_dist.std()])
 fig.update_layout(title='Conversions Prob Density Estimates',
                   xaxis_title='p',
                   yaxis_title='Prob Density',
                   hovermode="x")
-
-a_post_dist = beta_post_dist(alpha=1, beta=1, n_conv=df_summary['conv']['A'], n_total=df_summary['n_users']['A'])
-b_post_dist = beta_post_dist(alpha=1, beta=1, n_conv=df_summary['conv']['B'], n_total=df_summary['n_users']['B'])
-#todo: use floor, ceil
-xaxis_min = np.round(np.min([a_post_dist.mean() - 5 * a_post_dist.std(),
-                             b_post_dist.mean() - 5 * b_post_dist.std()]), 2)
-xaxis_max = np.round(np.max([a_post_dist.mean() + 5 * a_post_dist.std(),
-                             b_post_dist.mean() + 5 * b_post_dist.std()]), 2)
+xaxis_min = np.floor(xaxis_min * 100) / 100
+xaxis_max = np.ceil(xaxis_max * 100) / 100
 fig.update_layout(xaxis_range=[xaxis_min, xaxis_max])
-#fig.update_layout(xaxis_range=[0, 0.1])
 st.plotly_chart(fig)
 
 
@@ -355,32 +361,35 @@ fig.update_layout(title='B/A',
                   barmode='overlay')
 st.plotly_chart(fig)
 
-st.write(f"Expected(B/A) = {np.mean(post_sample_rel):.2f}")
-summary_container.write(f"Expected(B/A) = {np.mean(post_sample_rel):.2f}")
+df_formatted['Relative to A'] = pd.Series({'A':1.0, 'B':np.mean(post_sample_rel).round(2)}).astype(str)
+summary_bar.progress(0.8)
 
 
 pb_gt_pa = len(post_sample_rel[post_sample_rel > 1]) / len(post_sample_rel)
-pa_gte_pb = len(post_sample_rel[post_sample_rel <= 1]) / len(post_sample_rel)
-
-x = ['p_B <= p_A', 'p_B > p_A', ]
-y = [pa_gte_pb, pb_gt_pa]
-colors = ['red', 'green']
+df_summary['p_best_group'] = pd.Series({'A': (1 - pb_gt_pa), 'B':pb_gt_pa})
 
 fig = go.Figure()
-fig.add_trace(go.Bar(x=x, y=y, marker_color=colors, width=0.3))
+for gr in df_summary.index.unique():
+    fig.add_trace(
+        go.Bar(x=[gr], y=[df_summary['p_best_group'][gr]],
+               name=gr,
+               marker_color=df_summary['col'][gr], width=0.3))
 fig.update_layout(yaxis_range=[0,1])
+fig.update_layout(title='Prob(Highest p in Group)',
+                  yaxis_title='Prob')
 fig.update_layout(
      autosize=False,
      width=800,
      height=500)
 st.plotly_chart(fig)
 
-pb_gt_pa = len(post_sample_rel[post_sample_rel > 1]) / len(post_sample_rel)
-st.write(f'P(p_B/p_A > 1): {pb_gt_pa}')
-summary_container.write(f'P(p_B/p_A > 1): {pb_gt_pa}')
+df_formatted['Prob(Highest p in Group), %'] = np.round(df_summary['p_best_group'] * 100, 1).astype(str)
+summary_bar.progress(1)
+summary_bar.empty()
+summary_container.write(df_formatted.T, width=600)
 
 
-st.subheader("Daily P(p_B > p_A)")
+st.subheader("Duration Estimation")
 
 pb_gt_pa_required = st.number_input(label='Required P(p_B > p_A)',
                                     min_value=0.0,
@@ -388,6 +397,36 @@ pb_gt_pa_required = st.number_input(label='Required P(p_B > p_A)',
                                     format='%f',
                                     key='conv_pb_gt_pa_required')
 pb_gt_pa_required = pb_gt_pa_required / 100
+
+st.number_input(label='Total Affected Users',
+                min_value=1000,
+                step=1000,
+                format='%d',
+                key='conv_n_total_affected')
+
+col1, col2 = st.columns(2)
+with col1: 
+    st.number_input(label='Max N in Simulations',
+                    min_value=5000,
+                    step=5000,
+                    format='%d',
+                    key='conv_sim_max')
+with col2: 
+    st.number_input(label='N Step in Simulations',
+                    min_value=1000,
+                    step=1000,
+                    format='%d',
+                    key='conv_sim_step')
+
+n_simulations = st.number_input(label='Simulations',
+                                min_value=1,
+                                step=1,
+                                format='%d',
+                                key='conv_n_simulations')
+n_sim_steps = st.session_state['conv_sim_max'] // st.session_state['conv_sim_step']
+
+
+
 
 widedf = df.set_index(['group', 'day']).unstack(level=0)
 #display(widedf.head())
@@ -411,29 +450,9 @@ fig.update_layout(
     yaxis_tickformat = ',.0%')
 st.plotly_chart(fig)
 
-st.subheader("Simulations")
 
 
-col1, col2 = st.columns(2)
-with col1: 
-    st.number_input(label='Max N in Simulations',
-                    min_value=5000,
-                    step=5000,
-                    format='%d',
-                    key='conv_sim_max')
-with col2: 
-    st.number_input(label='N Step in Simulations',
-                    min_value=1000,
-                    step=1000,
-                    format='%d',
-                    key='conv_sim_step')
 
-n_simulations = st.number_input(label='Simulations',
-                                min_value=1,
-                                step=1,
-                                format='%d',
-                                key='conv_n_simulations')
-n_sim_steps = st.session_state['conv_sim_max'] // st.session_state['conv_sim_step']
 
 
 a_alpha_post, a_beta_post = alpha_beta_post(alpha=1, beta=1,
@@ -479,8 +498,6 @@ summary_container.write(f"""
     Duration for maximum expected conversions: {np.mean(n_max_hist)}  
 """)
 
-st.subheader("Duration Estimate for $P(p_B \ge p_A) = x$")
-
 st.write(f'Expected $N$ to reach $P(p_B \ge p_A)$ or $P(p_A \ge p_B) = {pb_gt_pa_required *100}$%: ${np.mean(n_reached_hist)}$')
 
 fig = go.Figure()
@@ -495,9 +512,15 @@ fig.update_layout(title=f'N to reach P(p_b >= p_a) = {pb_gt_pa_required * 100} o
 st.plotly_chart(fig)
 
 fig = go.Figure()
+n_fact = widedf['n_users_accum']['A'] + widedf['n_users_accum']['B']
+pb_ge_pa_fact = widedf['pb_gt_pa']
+fig.add_trace(go.Scatter(x=n_fact, y=pb_ge_pa_fact,
+                         mode='lines', line_color='blue', opacity=0.2,
+                         hovertemplate=f"Fact"))
 for s in sims:
     col = 'red' if (s['pb_ge_pa'][-1] > pb_gt_pa_required) or (s['pb_ge_pa'][-1] < 1 - pb_gt_pa_required) else 'blue'
-    fig.add_trace(go.Scatter(x=s['N'], y=s['pb_ge_pa'],
+    fig.add_trace(go.Scatter(x=s['N'] + n_fact.iloc[-1],
+                             y=s['pb_ge_pa'],
                              mode='lines', line_color=col, opacity=0.2,
                              hovertemplate=f"a_p: {s['A']['p'] * 100:.1f} %, b_p = {s['B']['p'] * 100:.1f} %"))
 fig.add_hline(y=pb_gt_pa_required, line_dash='dash')
@@ -509,13 +532,6 @@ fig.update_layout(title='Simulations',
                   height=550)
 st.plotly_chart(fig)
 
-st.subheader("Duration Estimate for Maximum Expected Conversions")
-
-st.number_input(label='Total Affected Users',
-                min_value=1000,
-                step=1000,
-                format='%d',
-                key='conv_n_total_affected')
 
 st.write(f'Expected N to reach max ExpConv: {np.mean(n_max_hist)}')
 #probs_at_nmax = [s['pb_ge_pa'][np.argmax(s['sim_and_expected_convs'])] for s in conv_sims]
