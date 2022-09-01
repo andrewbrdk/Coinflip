@@ -282,7 +282,6 @@ with st.spinner(text=f'Computing Conversions Interval Estimates ...'):
                         shared_yaxes=True,
                         column_widths=[0.85, 0.15],
                         subplot_titles=("Daily", "Total"))
-
     for gr in df_plot.index.unique():
         fig.add_trace(
             go.Scatter(x=df_plot['day'][gr], y=df_plot['p_accum'][gr],
@@ -316,93 +315,69 @@ with st.spinner(text=f'Computing Conversions Interval Estimates ...'):
 summary_bar.progress(0.6)
 
 
-
+fig = go.Figure()
 p_grid = np.linspace(start=0, stop=1, num=3001)
 xaxis_min = np.nan
 xaxis_max = np.nan
-fig = go.Figure()
 for gr in df_summary.index.unique():
     post_dist = beta_post_dist(alpha=1, beta=1,
                                n_conv=df_summary['conv'][gr],
                                n_total=df_summary['n_users'][gr])
+    xaxis_min = np.nanmin([xaxis_min, post_dist.mean() - 5 * post_dist.std()])
+    xaxis_max = np.nanmax([xaxis_max, post_dist.mean() + 5 * post_dist.std()])
     y_plot = post_dist.pdf(p_grid)
     fig.add_trace(go.Scatter(x=p_grid, y=y_plot, mode='lines',
                              name=gr,
                              line_color=df_summary['col'][gr]))
-    xaxis_min = np.nanmin([xaxis_min, post_dist.mean() - 5 * post_dist.std()])
-    xaxis_max = np.nanmax([xaxis_max, post_dist.mean() + 5 * post_dist.std()])
-fig.update_layout(title='Conversions Prob Density Estimates',
-                  xaxis_title='p',
-                  yaxis_title='Prob Density',
-                  hovermode="x")
 xaxis_min = np.floor(xaxis_min * 100) / 100
 xaxis_max = np.ceil(xaxis_max * 100) / 100
-fig.update_layout(xaxis_range=[xaxis_min, xaxis_max])
+fig.update_xaxes(range=[xaxis_min, xaxis_max])
+fig.update_layout(title='Conversions Prob Density Estimates',
+                  yaxis_title='Prob Density',
+                  xaxis_title='p',
+                  hovermode="x")
 st.plotly_chart(fig)
-
-
 
 
 n_sample = 100000
-
 post_sample_a = posterior_sample_for_binom_and_uniform_prior(df_summary['conv']['A'], df_summary['n_users']['A'], n_sample)
 post_sample_b = posterior_sample_for_binom_and_uniform_prior(df_summary['conv']['B'], df_summary['n_users']['B'], n_sample)
 post_sample_rel = post_sample_b / post_sample_a
-
-fig = go.Figure()
-fig.add_trace(go.Histogram(x=post_sample_rel, histnorm='probability density', 
-                           name='B/A', marker_color='red',
-                           opacity=0.6))
-fig.add_vline(x=1, line_dash="dash")
-
-fig.update_layout(title='B/A',
-                  xaxis_title='B/A',
-                  yaxis_title='Prob Density',
-                  barmode='overlay')
-st.plotly_chart(fig)
-
-df_formatted['Relative to A'] = pd.Series({'A':1.0, 'B':np.mean(post_sample_rel).round(2)}).astype(str)
-summary_bar.progress(0.8)
-
-
-pb_gt_pa = len(post_sample_rel[post_sample_rel > 1]) / len(post_sample_rel)
+pb_gt_pa = np.sum(post_sample_b > post_sample_a) / n_sample
 df_summary['p_best_group'] = pd.Series({'A': (1 - pb_gt_pa), 'B':pb_gt_pa})
 
-fig = go.Figure()
+fig = make_subplots(rows=1, cols=2, 
+                    column_widths=[0.85, 0.15],
+                    subplot_titles=("Relation", "Prob(Highest p)"))
+fig.add_trace(go.Histogram(x=post_sample_rel, histnorm='probability density', 
+                           name='B/A', marker_color='orange',
+                           opacity=0.6), 
+                           col=1, row=1)
+fig.add_vline(x=1, line_dash="dash", col=1, row=1)
 for gr in df_summary.index.unique():
     fig.add_trace(
         go.Bar(x=[gr], y=[df_summary['p_best_group'][gr]],
                name=gr,
-               marker_color=df_summary['col'][gr], width=0.3))
-fig.update_layout(yaxis_range=[0,1])
-fig.update_layout(title='Prob(Highest p in Group)',
-                  yaxis_title='Prob')
-fig.update_layout(
-     autosize=False,
-     width=800,
-     height=500)
+               marker_color=df_summary['col'][gr], width=0.3),
+        row=1, col=2)
+fig.update_layout(title='Conversions Comparison',
+                  xaxis_title='p_B / p_A',
+                  yaxis_title='Prob Density',
+                  barmode='overlay')
 st.plotly_chart(fig)
 
-df_formatted['Prob(Highest p in Group), %'] = np.round(df_summary['p_best_group'] * 100, 1).astype(str)
+
+
+df_formatted['Relative to A'] = pd.Series({'A':1.0, 'B':np.mean(post_sample_rel).round(2)}).astype(str)
+summary_bar.progress(0.8)
+
+df_formatted['Prob(Highest p), %'] = np.round(df_summary['p_best_group'] * 100, 1).astype(str)
 summary_bar.progress(1)
 summary_bar.empty()
 summary_container.write(df_formatted.T, width=600)
 
 
 st.subheader("Duration Estimation")
-
-pb_gt_pa_required = st.number_input(label='Required P(p_B > p_A)',
-                                    min_value=0.0,
-                                    step=1.0,
-                                    format='%f',
-                                    key='conv_pb_gt_pa_required')
-pb_gt_pa_required = pb_gt_pa_required / 100
-
-st.number_input(label='Total Affected Users',
-                min_value=1000,
-                step=1000,
-                format='%d',
-                key='conv_n_total_affected')
 
 col1, col2 = st.columns(2)
 with col1: 
@@ -425,6 +400,18 @@ n_simulations = st.number_input(label='Simulations',
                                 key='conv_n_simulations')
 n_sim_steps = st.session_state['conv_sim_max'] // st.session_state['conv_sim_step']
 
+pb_gt_pa_required = st.number_input(label='Required P(p_B > p_A)',
+                                    min_value=0.0,
+                                    step=1.0,
+                                    format='%f',
+                                    key='conv_pb_gt_pa_required')
+pb_gt_pa_required = pb_gt_pa_required / 100
+
+st.number_input(label='Total Affected Users',
+                min_value=1000,
+                step=1000,
+                format='%d',
+                key='conv_n_total_affected')
 
 
 
@@ -438,19 +425,6 @@ widedf['pb_gt_pa'] = widedf.apply(lambda row: prob_pb_gt_pa(
     N_b=row['n_users_accum']['B']), axis=1)
 widedf = widedf.reset_index()
 #display(widedf.head())
-
-fig = px.line(widedf, x='day', y='pb_gt_pa', markers=True,
-              title="P(p_b >= p_a)",
-              labels={"day": "Day", "pb_gt_pa": ""})
-fig.add_hline(y=0.5, line_dash="dash")
-fig.add_hline(y=pb_gt_pa_required, line_dash="dash")
-fig.add_hline(y=1 - pb_gt_pa_required, line_dash="dash")
-fig.update_layout(
-    yaxis_range=[0, 1],
-    yaxis_tickformat = ',.0%')
-st.plotly_chart(fig)
-
-
 
 
 
