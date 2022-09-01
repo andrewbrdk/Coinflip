@@ -163,7 +163,7 @@ st.number_input(label='N Days',
                 step=1,
                 format='%d',
                 key='conv_n_days')            
-st.number_input(label='B Group Traffic Part, %',
+st.number_input(label='B Group Traffic, %',
                 min_value=0.0,
                 max_value=100.0,
                 step=0.1,
@@ -515,8 +515,8 @@ fig = go.Figure()
 n_fact = widedf['n_users_accum']['A'] + widedf['n_users_accum']['B']
 pb_ge_pa_fact = widedf['pb_gt_pa']
 fig.add_trace(go.Scatter(x=n_fact, y=pb_ge_pa_fact,
-                         mode='lines', line_color='blue', opacity=0.2,
-                         hovertemplate=f"Fact"))
+                         mode='lines', line_color='blue', 
+                         hovertemplate=f"Fact, N:%x, p:%y"))
 for s in sims:
     col = 'red' if (s['pb_ge_pa'][-1] > pb_gt_pa_required) or (s['pb_ge_pa'][-1] < 1 - pb_gt_pa_required) else 'blue'
     fig.add_trace(go.Scatter(x=s['N'] + n_fact.iloc[-1],
@@ -551,7 +551,8 @@ st.plotly_chart(fig)
 fig = go.Figure()
 for s in sims:
     col = 'red'
-    fig.add_trace(go.Scatter(x=s['N'], y=s['expected_conversions_on_choice'],
+    fig.add_trace(go.Scatter(x=s['N'] + n_fact.iloc[-1],
+                             y=s['expected_conversions_on_choice'],
                              mode='lines', line_color=col, opacity=0.2,
                              hovertemplate=f"a_p: {s['A']['p'] * 100:.1f} %, b_p = {s['B']['p'] * 100:.1f} %"))
 fig.update_layout(title='Simulations',
