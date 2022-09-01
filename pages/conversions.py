@@ -133,7 +133,7 @@ st.session_state
 
 st.title('Conversions Comparison')
 
-st.subheader("Simulate Data")
+st.subheader("Generate Data")
 
 col1, col2 = st.columns(2)
 
@@ -192,7 +192,8 @@ df_exp = pd.concat([
                   'n_users': b_trials,
                   'conv': b_trials_conv})
 ])
-st.dataframe(df_exp, height=200)
+with st.expander("Show Generated Data"):
+    st.dataframe(df_exp)
 
 df = df_exp.copy()
 
@@ -472,42 +473,53 @@ summary_container.write(f"""
     Duration for maximum expected conversions: {np.mean(n_max_hist)}  
 """)
 
-st.write(f'Expected $N$ to reach $P(p_B \ge p_A)$ or $P(p_A \ge p_B) = {pb_gt_pa_required *100}$%: ${np.mean(n_reached_hist)}$')
 
-fig = go.Figure()
-fig.add_trace(go.Histogram(x=n_reached_hist, histnorm='probability', 
+n_fact = widedf['n_users_accum']['A'] + widedf['n_users_accum']['B']
+pb_ge_pa_fact = widedf['pb_gt_pa']
+
+fig = make_subplots(rows=2, cols=1, shared_xaxes=True)#, 
+                    #column_widths=[0.5, 0.5],
+                    #subplot_titles=("N for Required Certainty", "Simulations"))
+#fig = go.Figure()
+fig.add_trace(go.Histogram(x=n_reached_hist + n_fact.iloc[-1],
+                           histnorm='probability',
                            name='N to required P(p_b >= p_a) certainty', marker_color='red',
-                           opacity=0.6))
-fig.add_vline(x=np.mean(n_reached_hist), line_dash='dash')
+                           opacity=0.6),
+              row=1, col=1)
+fig.add_vline(x=np.mean(n_reached_hist) + n_fact.iloc[-1], line_dash='dash', row=1, col=1)
 fig.update_layout(title=f'N to reach P(p_b >= p_a) = {pb_gt_pa_required * 100} or P(p_a >= p_b) = {pb_gt_pa_required * 100} %',
                   xaxis_title='N',
                   yaxis_title='% from total simulations',
                   barmode='overlay')
-st.plotly_chart(fig)
+fig.update_xaxes(range=[0, st.session_state['conv_sim_max'] + 1])
+#st.plotly_chart(fig)
 
-fig = go.Figure()
-n_fact = widedf['n_users_accum']['A'] + widedf['n_users_accum']['B']
-pb_ge_pa_fact = widedf['pb_gt_pa']
+#fig = go.Figure()
+
 fig.add_trace(go.Scatter(x=n_fact, y=pb_ge_pa_fact,
-                         mode='lines', line_color='blue', 
-                         hovertemplate=f"Fact, N:%x, p:%y"))
+                         mode='lines', line_color='blue',
+                         hovertemplate=f"Fact, N:%x, p:%y"),
+              row=2, col=1)
 for s in sims:
-    col = 'red' if (s['pb_ge_pa'][-1] > pb_gt_pa_required) or (s['pb_ge_pa'][-1] < 1 - pb_gt_pa_required) else 'blue'
+    col = 'red' #if (s['pb_ge_pa'][-1] > pb_gt_pa_required) or (s['pb_ge_pa'][-1] < 1 - pb_gt_pa_required) else 'blue'
     fig.add_trace(go.Scatter(x=s['N'] + n_fact.iloc[-1],
                              y=s['pb_ge_pa'],
                              mode='lines', line_color=col, opacity=0.2,
-                             hovertemplate=f"a_p: {s['A']['p'] * 100:.1f} %, b_p = {s['B']['p'] * 100:.1f} %"))
-fig.add_hline(y=pb_gt_pa_required, line_dash='dash')
-fig.add_hline(y=1 - pb_gt_pa_required, line_dash='dash')
-fig.update_layout(title='Simulations',
+                             hovertemplate=f"a_p: {s['A']['p'] * 100:.1f} %, b_p = {s['B']['p'] * 100:.1f} %"),
+                  row=2, col=1)
+fig.add_hline(y=pb_gt_pa_required, line_dash='dash', row=2, col=1)
+fig.add_hline(y=1 - pb_gt_pa_required, line_dash='dash', row=2, col=1)
+fig.update_layout(title='N for Required Certainty',
                   xaxis_title='N',
                   yaxis_title='P(p_b >= p_a)',
-                  showlegend=False,
-                  height=550)
+                  height=550,
+                  showlegend=False)
 st.plotly_chart(fig)
+#st.write(f'Expected $N$ to reach $P(p_B \ge p_A)$ or $P(p_A \ge p_B) = {pb_gt_pa_required *100}$%: ${np.mean(n_reached_hist)}$')
 
 
-st.write(f'Expected N to reach max ExpConv: {np.mean(n_max_hist)}')
+
+#st.write(f'Expected N to reach max ExpConv: {np.mean(n_max_hist)}')
 #probs_at_nmax = [s['pb_ge_pa'][np.argmax(s['sim_and_expected_convs'])] for s in conv_sims]
 
 fig = go.Figure()
@@ -520,7 +532,6 @@ fig.update_layout(title=f'N to reach max ExpConv',
                   yaxis_title='% from total simulations',
                   barmode='overlay')
 st.plotly_chart(fig)
-
 
 fig = go.Figure()
 for s in sims:
