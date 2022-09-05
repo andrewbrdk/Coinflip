@@ -77,27 +77,23 @@ def init_session_values():
 init_session_values()
 #st.session_state
 
-st.title('Preliminary Test Duration')
+st.title('Preliminary Duration Estimate')
 
 #todo: choose what to test: conversions, means, etc'
 summary_container = st.container()
 summary_container.write(f"""
     Base conversion: {st.session_state['a_mean']} +- {st.session_state['a_std']}%  
     Expected experimental conversion: {st.session_state['b_mean']} +- {st.session_state['b_std']}%    
-    B Group Traffic Part: {st.session_state['b_split']}%   
+    Experimental group traffic: {st.session_state['b_split']}%   
     Required P(p_experiment > p_base): {st.session_state['pb_gt_pa_required']}%
 """)
 summary_bar = summary_container.progress(0)
 
-
-st.subheader("Details")
-
 st.subheader("A Priori Conversions")
-st.write("""
-    P(p) = Beta(mean, std)   
-""")
 #todo: choose parametrization
-
+# st.write("""
+#     P(p) = Beta(mean, std)   
+# """)
 
 col1, col2 = st.columns(2)
 
@@ -150,7 +146,7 @@ fig.add_trace(go.Scatter(x=x * 100, y=stats.beta.pdf(x, a_alpha, a_beta),
 fig.add_trace(go.Scatter(x=x * 100, y=stats.beta.pdf(x, b_alpha, b_beta),
                          mode='lines',
                          name=f"B: mean = {b_mean * 100} %, std = {(b_std * 100):.2f} %"))
-fig.update_layout(title='Conversions Prior Probability Density',
+fig.update_layout(title='A Priori Conversions',
                   xaxis_title='Conversions, %',
                   yaxis_title='Prob Density',
                   hovermode="x",
@@ -161,7 +157,7 @@ fig.update_xaxes(range=[xrange_min, xrange_max])
 st.plotly_chart(fig)
 
 
-st.subheader("Simulations")
+st.subheader("Duration Estimates")
 
 st.number_input(label='B Group Traffic Part, %',
                 min_value=0.0,
