@@ -142,7 +142,7 @@ b_nu = b_mean * (1 - b_mean) / b_var - 1
 b_alpha = b_mean * b_nu
 b_beta = (1 - b_mean) * b_nu
 
-x = np.linspace(0, 1, 1001)
+x = np.linspace(0, 1, 3001)
 fig = go.Figure()
 fig.add_trace(go.Scatter(x=x * 100, y=stats.beta.pdf(x, a_alpha, a_beta),
                          mode='lines',
@@ -155,6 +155,9 @@ fig.update_layout(title='Conversions Prior Probability Density',
                   yaxis_title='Prob Density',
                   hovermode="x",
                   height=550)
+xrange_min = np.floor(np.min([a_mean - 5 * a_std, b_mean - 5 * b_std]) * 100)
+xrange_max = np.ceil(np.max([a_mean + 5 * a_std, b_mean + 5 * b_std]) * 100)
+fig.update_xaxes(range=[xrange_min, xrange_max])
 st.plotly_chart(fig)
 
 
