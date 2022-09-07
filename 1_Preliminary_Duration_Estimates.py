@@ -90,11 +90,11 @@ st.title('Preliminary Duration Estimates')
 #todo: choose what to test: conversions, means, etc'
 summary_container = st.container()
 summary_container.write(f"""
-    Base conversion: {st.session_state['a_mean']} +- {st.session_state['a_std']}%  
-    Expected experimental conversion: {st.session_state['b_mean']} +- {st.session_state['b_std']}%    
+    Group A conversion: {st.session_state['a_mean']} +- {st.session_state['a_std']}%  
+    Expected group B conversion: {st.session_state['b_mean']} +- {st.session_state['b_std']}%    
       
     Daily users: {st.session_state['sim_step']}  
-    Experimental group traffic: {st.session_state['b_split']:.0f}%   
+    Group B traffic: {st.session_state['b_split']:.0f}%   
 """)
 summary_bar = summary_container.progress(0)
 
@@ -172,7 +172,6 @@ with col1:
 with col2: 
     st.number_input(label='Daily Users',
                     min_value=1000,
-                    #value=st.session_state['sim_step'],
                     step=1000,
                     format='%d',
                     key='sim_step')
@@ -185,7 +184,6 @@ n_simulations = st.number_input(label='Simulations',
 
 pb_gt_pa_required = st.number_input(label='Required P(p_B > p_A), %',
                                     min_value=0.0,
-                                    #value=st.session_state['pb_gt_pa_required'],
                                     step=1.0,
                                     format='%f',
                                     key='pb_gt_pa_required')
@@ -228,8 +226,8 @@ summary_bar.empty()
 n_reached_hist = [s['min_n_to_reach_certainty_lvl'] for s in sims]
 n_reached_freqs = pd.Series(n_reached_hist).value_counts(normalize=True).rename('freq').to_frame()
 summary_container.write(f"""
-    Required P(p_experiment > p_base): {st.session_state['pb_gt_pa_required']}%  
-    Estimated experiment duration to reach P(p_experiment > p_base) = {st.session_state['pb_gt_pa_required']}: {np.mean(n_reached_hist)}  
+    Required P(p_B > p_A): {st.session_state['pb_gt_pa_required']}%  
+    Estimated experiment duration to reach P(p_B > p_A) = {st.session_state['pb_gt_pa_required']}: {np.mean(n_reached_hist)}  
 """)
 
 fig = go.Figure()
