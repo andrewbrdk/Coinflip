@@ -44,6 +44,12 @@ def min_n_to_reach_certainty_level(probs_pb_ge_pa, trials_accum, required_pb_ge_
     min_reached = np.min(reached) if prob_gt_required[-1] else np.max(trials_accum)
     return min_reached
 
+def min_days_to_reach_certainty_level(probs_pb_ge_pa, days, required_pb_ge_pa):
+    prob_gt_required = (probs_pb_ge_pa > required_pb_ge_pa) | (probs_pb_ge_pa < 1 - required_pb_ge_pa)
+    reached = days[prob_gt_required]
+    min_reached = np.min(reached) if prob_gt_required[-1] else np.max(days)
+    return min_reached
+
 def conversions_on_choice(a_sim, b_sim, probs_pb_ge_pa, trials_accum, n_total_affected):
     pa_mean = stats.beta(a_sim['alpha_post'], a_sim['beta_post']).mean()
     pb_mean = stats.beta(b_sim['alpha_post'], b_sim['beta_post']).mean()
@@ -214,13 +220,11 @@ with st.spinner(text=f'Running {n_simulations} simulations ...'):
         s['A'] = simulate(a_p, a_trials, a_alpha, a_beta)
         s['B'] = simulate(b_p, b_trials, b_alpha, b_beta)
         s['pb_ge_pa'] = pb_ge_pa_sims(s['A'], s['B'], n_cmp=10000)
-        s['days'] = np.arange(st.session_state['sim_max_days'])
+        s['days'] = np.arange(st.session_state['sim_max_days'] + 1)
         s['N'] = s['A']['trials_accum'] + s['B']['trials_accum']
         s['pb_gt_pa_required'] = st.session_state['pb_gt_pa_required'] / 100
         s['min_n_to_reach_certainty_lvl'] = min_n_to_reach_certainty_level(s['pb_ge_pa'], s['N'], s['pb_gt_pa_required'])
-        s['n_total_affected'] = st.session_state['n_total_affected']
-        s['expected_conversions_on_choice'] = conversions_on_choice(s['A'], s['B'], s['pb_ge_pa'], s['N'], s['n_total_affected'])
-        s['n_for_max_expected_conv'] = s['N'][np.argmax(s['expected_conversions_on_choice'])]
+        s['min_days_to_reach_certainty_lvl'] = min_days_to_reach_certainty_level(s['pb_ge_pa'], s['days'], s['pb_gt_pa_required'])
         sims.append(s)
         i = i + 1
         my_bar.progress(i / n_simulations)
@@ -229,39 +233,39 @@ with st.spinner(text=f'Running {n_simulations} simulations ...'):
 my_bar.empty()
 summary_bar.empty()
 
-n_reached_hist = [s['min_n_to_reach_certainty_lvl'] for s in sims]
+n_reached_hist = [s['min_days_to_reach_certainty_lvl'] for s in sims]
 n_reached_freqs = pd.Series(n_reached_hist).value_counts(normalize=True).rename('freq').to_frame()
+x_med = np.median(n_reached_hist)
+if len(n_reached_freqs['freq']) == 1:
+    summary_line = f"100% simulations reached certainty at day {n_reached_freqs.index[0]}"
+else:
+    summary_line = f"50% simulations reached {pb_gt_pa_required*100:.0f}% certainty at day {x_med:.0f} or earlier"
+
 summary_container.write(f"""
-    Required P(p_B > p_A): {st.session_state['pb_gt_pa_required']}%  
-    Estimated experiment duration to reach P(p_B > p_A) = {st.session_state['pb_gt_pa_required']}: {np.mean(n_reached_hist)}  
+    Required certainty: {st.session_state['pb_gt_pa_required']}%  
+    {summary_line}
 """)
 
 fig = go.Figure()
 fig.add_trace(go.Bar(x=n_reached_freqs.index,
                      y=n_reached_freqs['freq'],
-                     width=[st.session_state['sim_daily_users']] * len(n_reached_freqs),
+                     width=[1] * len(n_reached_freqs),
                      marker_color='red',
                      opacity=0.6,
                      name='Simulations Reached Certainty'))
-x_med = np.median(n_reached_hist)
 fig.add_trace(go.Scatter(x=[x_med, x_med], y=[0, np.max(n_reached_freqs['freq'])], 
                          line_color='black',
                          line_dash='dash',
                          mode='lines',
                          hovertemplate=f"Median: {x_med}",
                          name='Median'))              
-fig.update_layout(title=f'N to Reach {pb_gt_pa_required*100:.0f}% Certainty')
-fig.update_layout(xaxis_title='N',
+fig.update_layout(title=f'Days to Reach {pb_gt_pa_required*100:.0f}% Certainty')
+fig.update_layout(xaxis_title='Days',
                   yaxis_title='Part from Total Simulations',
                   showlegend=False)
-fig.update_xaxes(range=[0, sim_max + st.session_state['sim_daily_users']])
+fig.update_xaxes(range=[0, st.session_state['sim_max_days'] + 1])
 fig.update_layout(yaxis_rangemode='tozero')
 st.plotly_chart(fig)
-
-if len(n_reached_freqs['freq']) == 1:
-    st.write(f"100% simulations reached certainty at {n_reached_freqs.index[0]}")
-else:
-    st.write(f"50% simulations reached {pb_gt_pa_required*100:.0f}% certainty at N={x_med} or earlier.")
 
 st.markdown('---')
 st.write("Sources: https://github.com/noooway/Coinflip")
