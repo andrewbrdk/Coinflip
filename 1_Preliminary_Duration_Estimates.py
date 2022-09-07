@@ -183,7 +183,7 @@ n_simulations = st.number_input(label='Simulations',
                                 format='%d',
                                 key='n_simulations')
 
-pb_gt_pa_required = st.number_input(label='Required P(p_B > p_A)',
+pb_gt_pa_required = st.number_input(label='Required P(p_B > p_A), %',
                                     min_value=0.0,
                                     #value=st.session_state['pb_gt_pa_required'],
                                     step=1.0,
@@ -226,25 +226,38 @@ my_bar.empty()
 summary_bar.empty()
 
 n_reached_hist = [s['min_n_to_reach_certainty_lvl'] for s in sims]
-n_max_hist = [s['n_for_max_expected_conv'] for s in sims]
+n_reached_freqs = pd.Series(n_reached_hist).value_counts(normalize=True).rename('freq').to_frame()
 summary_container.write(f"""
     Required P(p_experiment > p_base): {st.session_state['pb_gt_pa_required']}%  
     Estimated experiment duration to reach P(p_experiment > p_base) = {st.session_state['pb_gt_pa_required']}: {np.mean(n_reached_hist)}  
 """)
 
-
 fig = go.Figure()
-fig.add_trace(go.Histogram(x=n_reached_hist, histnorm='probability', 
-                           name='N to required P(p_b >= p_a) certainty', marker_color='red',
-                           opacity=0.6))
-fig.add_vline(x=np.mean(n_reached_hist), line_dash='dash')
-fig.update_layout(title=f'N to reach P(p_b >= p_a) = {pb_gt_pa_required * 100} or P(p_a >= p_b) = {pb_gt_pa_required * 100} %',
-                  xaxis_title='N',
-                  yaxis_title='% from total simulations',
-                  barmode='overlay')
+fig.add_trace(go.Bar(x=n_reached_freqs.index,
+                     y=n_reached_freqs['freq'],
+                     width=[st.session_state['sim_step']] * len(n_reached_freqs),
+                     marker_color='red',
+                     opacity=0.6,
+                     name='Simulations Reached Certainty'))
+x_med = np.median(n_reached_hist)
+fig.add_trace(go.Scatter(x=[x_med, x_med], y=[0, np.max(n_reached_freqs['freq'])], 
+                         line_color='black',
+                         line_dash='dash',
+                         mode='lines',
+                         hovertemplate=f"Median: {x_med}",
+                         name='Median'))              
+fig.update_layout(title=f'N to Reach {pb_gt_pa_required*100:.0f}% Certainty')
+fig.update_layout(xaxis_title='N',
+                  yaxis_title='Part from Total Simulations',
+                  showlegend=False)
+fig.update_xaxes(range=[0, st.session_state['sim_max'] + st.session_state['sim_step']])
+fig.update_layout(yaxis_rangemode='tozero')
 st.plotly_chart(fig)
 
-st.write(f'Expected $N$ to reach $P(p_B \ge p_A)$ or $P(p_A \ge p_B) = {pb_gt_pa_required *100}$%: ${np.mean(n_reached_hist)}$')
+if len(n_reached_freqs['freq']) == 1:
+    st.write(f"100% simulations reached certainty at {n_reached_freqs.index[0]}")
+else:
+    st.write(f"50% simulations reached {pb_gt_pa_required*100:.0f}% certainty at N={x_med} or earlier.")
 
 st.markdown('---')
 st.write("Sources: https://github.com/noooway/Coinflip")
