@@ -8,6 +8,7 @@ import streamlit as st
 #rng = default_rng(17)
 np.random.seed(7)
 
+#todo: move common functions to separate module
 def pb_ge_pa(a_alpha, a_beta, b_alpha, b_beta, n_cmp=30000):
     pa = stats.beta.rvs(a_alpha, a_beta, size=n_cmp)
     pb = stats.beta.rvs(b_alpha, b_beta, size=n_cmp)
@@ -52,6 +53,13 @@ def conversions_on_choice(a_sim, b_sim, probs_pb_ge_pa, trials_accum, n_total_af
     sim_and_expected_convs = after_choice + a_sim['trials_conv_accum'] + b_sim['trials_conv_accum']
     return sim_and_expected_convs    
 
+def beta_dist_mean_std_to_alpha_beta(mean, std):
+    var = std**2
+    nu = mean * (1 - mean) / var - 1
+    alpha = mean * nu
+    beta = (1 - mean) * nu
+    return alpha, beta
+
 def init_session_values():
     if 'a_mean' not in st.session_state:
         st.session_state['a_mean'] = 15.0
@@ -91,9 +99,6 @@ summary_bar = summary_container.progress(0)
 
 st.subheader("A Priori Conversions")
 #todo: choose parametrization
-# st.write("""
-#     P(p) = Beta(mean, std)   
-# """)
 
 col1, col2 = st.columns(2)
 
@@ -101,13 +106,11 @@ with col1:
     st.number_input(label='A Mean, %',
                     min_value=0.0,
                     max_value=100.0,
-                    #value=st.session_state['a_mean'],
                     step=0.1,
                     format='%f',
                     key='a_mean')
     st.number_input(label='A Std, %',
                     min_value=0.01,
-                    #value=st.session_state['a_std'],
                     step=0.01,
                     format='%f',
                     key='a_std')
@@ -116,27 +119,19 @@ with col2:
     st.number_input(label='B Mean, %',
                     min_value=0.0,
                     max_value=100.0,
-                    #value=st.session_state['b_mean'],
                     step=0.1,
                     format='%f',
                     key='b_mean')
     st.number_input(label='B Std, %',
                     min_value=0.01,
-                    #value=st.session_state['b_std'],
                     step=0.01,
                     format='%f',
                     key='b_std')
 
 a_mean, a_std = st.session_state['a_mean']/100, st.session_state['a_std']/100
 b_mean, b_std = st.session_state['b_mean']/100, st.session_state['b_std']/100
-a_var = a_std**2
-a_nu = a_mean * (1 - a_mean) / a_var - 1
-a_alpha = a_mean * a_nu
-a_beta = (1 - a_mean) * a_nu
-b_var = b_std**2
-b_nu = b_mean * (1 - b_mean) / b_var - 1
-b_alpha = b_mean * b_nu
-b_beta = (1 - b_mean) * b_nu
+a_alpha, a_beta = beta_dist_mean_std_to_alpha_beta(a_mean, a_std)
+b_alpha, b_beta = beta_dist_mean_std_to_alpha_beta(b_mean, b_std)
 
 x = np.linspace(0, 1, 3001)
 fig = go.Figure()
@@ -161,7 +156,6 @@ st.subheader("Duration Estimates")
 
 st.number_input(label='B Group Traffic Part, %',
                 min_value=0.0,
-                #value=st.session_state['b_split'],
                 step=1.0,
                 format='%f',
                 key='b_split')
