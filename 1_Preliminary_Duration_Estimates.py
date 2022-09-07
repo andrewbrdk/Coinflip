@@ -85,15 +85,16 @@ def init_session_values():
 init_session_values()
 #st.session_state
 
-st.title('Preliminary Duration Estimate')
+st.title('Preliminary Duration Estimates')
 
 #todo: choose what to test: conversions, means, etc'
 summary_container = st.container()
 summary_container.write(f"""
     Base conversion: {st.session_state['a_mean']} +- {st.session_state['a_std']}%  
     Expected experimental conversion: {st.session_state['b_mean']} +- {st.session_state['b_std']}%    
-    Experimental group traffic: {st.session_state['b_split']}%   
-    Required P(p_experiment > p_base): {st.session_state['pb_gt_pa_required']}%
+      
+    Daily users: {st.session_state['sim_step']}  
+    Experimental group traffic: {st.session_state['b_split']:.0f}%   
 """)
 summary_bar = summary_container.progress(0)
 
@@ -154,7 +155,7 @@ st.plotly_chart(fig)
 
 st.subheader("Duration Estimates")
 
-st.number_input(label='B Group Traffic Part, %',
+st.number_input(label='B Group Traffic, %',
                 min_value=0.0,
                 step=1.0,
                 format='%f',
@@ -163,14 +164,13 @@ b_split = st.session_state['b_split'] / 100
 
 col1, col2 = st.columns(2)
 with col1: 
-    st.number_input(label='Max N in Simulations',
+    st.number_input(label='Max Days in Simulations',
                     min_value=5000,
-                    #value=st.session_state['sim_max'],
                     step=5000,
                     format='%d',
                     key='sim_max')
 with col2: 
-    st.number_input(label='N Step in Simulations',
+    st.number_input(label='Daily Users',
                     min_value=1000,
                     #value=st.session_state['sim_step'],
                     step=1000,
@@ -179,10 +179,18 @@ with col2:
 
 n_simulations = st.number_input(label='Simulations',
                                 min_value=1,
-                                #value=st.session_state['n_simulations'],
                                 step=1,
                                 format='%d',
                                 key='n_simulations')
+
+pb_gt_pa_required = st.number_input(label='Required P(p_B > p_A)',
+                                    min_value=0.0,
+                                    #value=st.session_state['pb_gt_pa_required'],
+                                    step=1.0,
+                                    format='%f',
+                                    key='pb_gt_pa_required')
+pb_gt_pa_required = pb_gt_pa_required / 100
+
 n_sim_steps = st.session_state['sim_max'] // st.session_state['sim_step']
 
 a_prior = stats.beta(a_alpha, a_beta)
@@ -220,21 +228,10 @@ summary_bar.empty()
 n_reached_hist = [s['min_n_to_reach_certainty_lvl'] for s in sims]
 n_max_hist = [s['n_for_max_expected_conv'] for s in sims]
 summary_container.write(f"""
+    Required P(p_experiment > p_base): {st.session_state['pb_gt_pa_required']}%  
     Estimated experiment duration to reach P(p_experiment > p_base) = {st.session_state['pb_gt_pa_required']}: {np.mean(n_reached_hist)}  
-    Duration for maximum expected conversions: {np.mean(n_max_hist)}  
 """)
 
-st.subheader("Duration Estimate for $P(p_B \ge p_A) = x$")
-
-pb_gt_pa_required = st.number_input(label='Required P(p_B > p_A)',
-                                    min_value=0.0,
-                                    #value=st.session_state['pb_gt_pa_required'],
-                                    step=1.0,
-                                    format='%f',
-                                    key='pb_gt_pa_required')
-pb_gt_pa_required = pb_gt_pa_required / 100
-
-st.write(f'Expected $N$ to reach $P(p_B \ge p_A)$ or $P(p_A \ge p_B) = {pb_gt_pa_required *100}$%: ${np.mean(n_reached_hist)}$')
 
 fig = go.Figure()
 fig.add_trace(go.Histogram(x=n_reached_hist, histnorm='probability', 
@@ -247,59 +244,8 @@ fig.update_layout(title=f'N to reach P(p_b >= p_a) = {pb_gt_pa_required * 100} o
                   barmode='overlay')
 st.plotly_chart(fig)
 
-fig = go.Figure()
-for s in sims:
-    col = 'red' if (s['pb_ge_pa'][-1] > pb_gt_pa_required) or (s['pb_ge_pa'][-1] < 1 - pb_gt_pa_required) else 'blue'
-    fig.add_trace(go.Scatter(x=s['N'], y=s['pb_ge_pa'],
-                             mode='lines', line_color=col, opacity=0.2,
-                             hovertemplate=f"a_p: {s['A']['p'] * 100:.1f} %, b_p = {s['B']['p'] * 100:.1f} %"))
-fig.add_hline(y=pb_gt_pa_required, line_dash='dash')
-fig.add_hline(y=1 - pb_gt_pa_required, line_dash='dash')
-fig.update_layout(title='Simulations',
-                  xaxis_title='N',
-                  yaxis_title='P(p_b >= p_a)',
-                  showlegend=False,
-                  height=550)
-st.plotly_chart(fig)
+st.write(f'Expected $N$ to reach $P(p_B \ge p_A)$ or $P(p_A \ge p_B) = {pb_gt_pa_required *100}$%: ${np.mean(n_reached_hist)}$')
 
-st.subheader("Duration Estimate for Maximum Expected Conversions")
-
-st.number_input(label='Total Affected Users',
-                min_value=1000,
-                #value=st.session_state['n_total_affected'],
-                step=1000,
-                format='%d',
-                key='n_total_affected')
-
-st.write(f'Expected N to reach max ExpConv: {np.mean(n_max_hist)}')
-#probs_at_nmax = [s['pb_ge_pa'][np.argmax(s['sim_and_expected_convs'])] for s in conv_sims]
-
-fig = go.Figure()
-fig.add_trace(go.Histogram(x=n_max_hist, histnorm='probability', 
-                           name='N to required max ExpConv', marker_color='red',
-                           opacity=0.6))
-fig.add_vline(x=np.mean(n_max_hist), line_dash='dash')
-fig.update_layout(title=f'N to reach max ExpConv',
-                  xaxis_title='N',
-                  yaxis_title='% from total simulations',
-                  barmode='overlay')
-st.plotly_chart(fig)
-
-
-fig = go.Figure()
-for s in sims:
-    col = 'red'
-    fig.add_trace(go.Scatter(x=s['N'], y=s['expected_conversions_on_choice'],
-                             mode='lines', line_color=col, opacity=0.2,
-                             hovertemplate=f"a_p: {s['A']['p'] * 100:.1f} %, b_p = {s['B']['p'] * 100:.1f} %"))
-fig.update_layout(title='Simulations',
-                  xaxis_title='N',
-                  yaxis_title='Expected Conversions',
-                  showlegend=False,
-                  height=550)
-st.plotly_chart(fig)
-
-#todo: make simulations plots readable or remove them
 st.markdown('---')
-st.write("Get the sources at https://github.com/noooway/Coinflip")
-st.write("See theory explanation at https://github.com/noooway/Bayesian_ab_testing")
+st.write("Sources: https://github.com/noooway/Coinflip")
+st.write("Theory: https://github.com/noooway/Bayesian_ab_testing")
