@@ -75,10 +75,10 @@ def init_session_values():
         st.session_state['pb_gt_pa_required'] = 95.0
     if 'n_total_affected' not in st.session_state:
         st.session_state['n_total_affected'] = 10**6
-    if 'sim_max' not in st.session_state:
-        st.session_state['sim_max'] = 100000
-    if 'sim_step' not in st.session_state:
-        st.session_state['sim_step'] = 5000
+    if 'sim_max_days' not in st.session_state:
+        st.session_state['sim_max_days'] = 30
+    if 'sim_daily_users' not in st.session_state:
+        st.session_state['sim_daily_users'] = 5000
     if 'n_simulations' not in st.session_state:
         st.session_state['n_simulations'] = 100
         
@@ -93,7 +93,7 @@ summary_container.write(f"""
     Group A conversion: {st.session_state['a_mean']} +- {st.session_state['a_std']}%  
     Expected group B conversion: {st.session_state['b_mean']} +- {st.session_state['b_std']}%    
       
-    Daily users: {st.session_state['sim_step']}  
+    Daily users: {st.session_state['sim_daily_users']}  
     Group B traffic: {st.session_state['b_split']:.0f}%   
 """)
 summary_bar = summary_container.progress(0)
@@ -155,48 +155,53 @@ st.plotly_chart(fig)
 
 st.subheader("Duration Estimates")
 
-st.number_input(label='B Group Traffic, %',
-                min_value=0.0,
-                step=1.0,
-                format='%f',
-                key='b_split')
-b_split = st.session_state['b_split'] / 100
 
 col1, col2 = st.columns(2)
 with col1: 
-    st.number_input(label='Max Days in Simulations',
-                    min_value=5000,
-                    step=5000,
-                    format='%d',
-                    key='sim_max')
-with col2: 
     st.number_input(label='Daily Users',
-                    min_value=1000,
-                    step=1000,
+                    min_value=100,
+                    step=100,
                     format='%d',
-                    key='sim_step')
+                    key='sim_daily_users')
 
-n_simulations = st.number_input(label='Simulations',
-                                min_value=1,
-                                step=1,
-                                format='%d',
-                                key='n_simulations')
+    st.number_input(label='Max Days in Simulations',
+                    min_value=1,
+                    step=1,
+                    format='%d',
+                    key='sim_max_days')
+with col2:
+    st.number_input(label='B Group Traffic, %',
+                    min_value=0.0,
+                    step=1.0,
+                    format='%f',
+                    key='b_split')
 
-pb_gt_pa_required = st.number_input(label='Required P(p_B > p_A), %',
-                                    min_value=0.0,
-                                    step=1.0,
-                                    format='%f',
-                                    key='pb_gt_pa_required')
-pb_gt_pa_required = pb_gt_pa_required / 100
+    st.number_input(label='Simulations',
+                    min_value=1,
+                    step=1,
+                    format='%d',
+                    key='n_simulations')
+    
+st.number_input(label='Required Certainty, %',
+                min_value=0.0,
+                step=1.0,
+                format='%f',
+                key='pb_gt_pa_required')
 
-n_sim_steps = st.session_state['sim_max'] // st.session_state['sim_step']
+b_split = st.session_state['b_split'] / 100
+n_simulations = st.session_state['n_simulations']
+pb_gt_pa_required = st.session_state['pb_gt_pa_required'] / 100
+
+sim_max = st.session_state['sim_max_days'] * st.session_state['sim_daily_users']
+n_sim_steps = st.session_state['sim_max_days']
 
 a_prior = stats.beta(a_alpha, a_beta)
 b_prior = stats.beta(b_alpha, b_beta)
 a_p_sim = a_prior.rvs(n_simulations)
 b_p_sim = b_prior.rvs(n_simulations)
 
-trials = np.append(0, np.full(fill_value=st.session_state['sim_step'], shape=n_sim_steps))
+trials = np.append(0, np.full(fill_value=st.session_state['sim_daily_users'],
+                              shape=st.session_state['sim_max_days']))
 a_trials = np.rint(trials * (1 - b_split)).astype(int)
 b_trials = np.rint(trials * b_split).astype(int)
 
@@ -209,6 +214,7 @@ with st.spinner(text=f'Running {n_simulations} simulations ...'):
         s['A'] = simulate(a_p, a_trials, a_alpha, a_beta)
         s['B'] = simulate(b_p, b_trials, b_alpha, b_beta)
         s['pb_ge_pa'] = pb_ge_pa_sims(s['A'], s['B'], n_cmp=10000)
+        s['days'] = np.arange(st.session_state['sim_max_days'])
         s['N'] = s['A']['trials_accum'] + s['B']['trials_accum']
         s['pb_gt_pa_required'] = st.session_state['pb_gt_pa_required'] / 100
         s['min_n_to_reach_certainty_lvl'] = min_n_to_reach_certainty_level(s['pb_ge_pa'], s['N'], s['pb_gt_pa_required'])
@@ -233,7 +239,7 @@ summary_container.write(f"""
 fig = go.Figure()
 fig.add_trace(go.Bar(x=n_reached_freqs.index,
                      y=n_reached_freqs['freq'],
-                     width=[st.session_state['sim_step']] * len(n_reached_freqs),
+                     width=[st.session_state['sim_daily_users']] * len(n_reached_freqs),
                      marker_color='red',
                      opacity=0.6,
                      name='Simulations Reached Certainty'))
@@ -248,7 +254,7 @@ fig.update_layout(title=f'N to Reach {pb_gt_pa_required*100:.0f}% Certainty')
 fig.update_layout(xaxis_title='N',
                   yaxis_title='Part from Total Simulations',
                   showlegend=False)
-fig.update_xaxes(range=[0, st.session_state['sim_max'] + st.session_state['sim_step']])
+fig.update_xaxes(range=[0, sim_max + st.session_state['sim_daily_users']])
 fig.update_layout(yaxis_rangemode='tozero')
 st.plotly_chart(fig)
 
