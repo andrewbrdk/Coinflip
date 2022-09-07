@@ -9,20 +9,6 @@ import streamlit as st
 np.random.seed(7)
 
 #todo: move common functions to separate module
-def pb_ge_pa(a_alpha, a_beta, b_alpha, b_beta, n_cmp=30000):
-    pa = stats.beta.rvs(a_alpha, a_beta, size=n_cmp)
-    pb = stats.beta.rvs(b_alpha, b_beta, size=n_cmp)
-    return np.sum(pb >= pa) / n_cmp
-
-def pb_ge_pa_sims(s_a, s_b, n_cmp=30000):
-    n_pars = len(s_a['alpha_post'])
-    pa = stats.beta.rvs(s_a['alpha_post'], s_a['beta_post'], size=(n_cmp, n_pars))
-    pb = stats.beta.rvs(s_b['alpha_post'], s_b['beta_post'], size=(n_cmp, n_pars))
-    return np.sum(pb >= pa, axis=0) / n_cmp   
-
-def expected_conv_after_choice(pa_mean, pb_mean, pb_ge_pa, n_rest):
-    return int(pa_mean * (1 - pb_ge_pa) * n_rest + pb_mean * pb_ge_pa * n_rest)
-
 def simulate(p, trials, alpha, beta):
     trials_conv = stats.binom.rvs(n=trials, p=p)
     trials_accum = np.cumsum(trials)
@@ -38,27 +24,18 @@ def simulate(p, trials, alpha, beta):
     }
     return s 
 
-def min_n_to_reach_certainty_level(probs_pb_ge_pa, trials_accum, required_pb_ge_pa):
-    prob_gt_required = (probs_pb_ge_pa > required_pb_ge_pa) | (probs_pb_ge_pa < 1 - required_pb_ge_pa)
-    reached = trials_accum[prob_gt_required]
-    min_reached = np.min(reached) if prob_gt_required[-1] else np.max(trials_accum)
-    return min_reached
+def pb_ge_pa_sims(s_a, s_b, n_cmp=30000):
+    n_pars = len(s_a['alpha_post'])
+    pa = stats.beta.rvs(s_a['alpha_post'], s_a['beta_post'], size=(n_cmp, n_pars))
+    pb = stats.beta.rvs(s_b['alpha_post'], s_b['beta_post'], size=(n_cmp, n_pars))
+    return np.sum(pb >= pa, axis=0) / n_cmp
 
 def min_days_to_reach_certainty_level(probs_pb_ge_pa, days, required_pb_ge_pa):
     prob_gt_required = (probs_pb_ge_pa > required_pb_ge_pa) | (probs_pb_ge_pa < 1 - required_pb_ge_pa)
     reached = days[prob_gt_required]
     min_reached = np.min(reached) if prob_gt_required[-1] else np.max(days)
     return min_reached
-
-def conversions_on_choice(a_sim, b_sim, probs_pb_ge_pa, trials_accum, n_total_affected):
-    pa_mean = stats.beta(a_sim['alpha_post'], a_sim['beta_post']).mean()
-    pb_mean = stats.beta(b_sim['alpha_post'], b_sim['beta_post']).mean()
-    after_choice = np.array([expected_conv_after_choice(pa_m, pb_m, pb_ge_pa, n_total_affected - n_exp) 
-                              for pa_m, pb_m, pb_ge_pa, n_exp
-                              in zip(pa_mean, pb_mean, probs_pb_ge_pa, trials_accum)])
-    sim_and_expected_convs = after_choice + a_sim['trials_conv_accum'] + b_sim['trials_conv_accum']
-    return sim_and_expected_convs    
-
+    
 def beta_dist_mean_std_to_alpha_beta(mean, std):
     var = std**2
     nu = mean * (1 - mean) / var - 1
@@ -79,8 +56,6 @@ def init_session_values():
         st.session_state['b_split'] = 50.0
     if 'pb_gt_pa_required' not in st.session_state:
         st.session_state['pb_gt_pa_required'] = 95.0
-    if 'n_total_affected' not in st.session_state:
-        st.session_state['n_total_affected'] = 10**6
     if 'sim_max_days' not in st.session_state:
         st.session_state['sim_max_days'] = 30
     if 'sim_daily_users' not in st.session_state:
@@ -223,7 +198,6 @@ with st.spinner(text=f'Running {n_simulations} simulations ...'):
         s['days'] = np.arange(st.session_state['sim_max_days'] + 1)
         s['N'] = s['A']['trials_accum'] + s['B']['trials_accum']
         s['pb_gt_pa_required'] = st.session_state['pb_gt_pa_required'] / 100
-        s['min_n_to_reach_certainty_lvl'] = min_n_to_reach_certainty_level(s['pb_ge_pa'], s['N'], s['pb_gt_pa_required'])
         s['min_days_to_reach_certainty_lvl'] = min_days_to_reach_certainty_level(s['pb_ge_pa'], s['days'], s['pb_gt_pa_required'])
         sims.append(s)
         i = i + 1
