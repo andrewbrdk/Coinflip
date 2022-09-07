@@ -63,8 +63,8 @@ def init_session_values():
     if 'n_simulations' not in st.session_state:
         st.session_state['n_simulations'] = 100
         
+
 init_session_values()
-#st.session_state
 
 st.title('Preliminary Duration Estimates')
 
@@ -80,7 +80,6 @@ summary_container.write(f"""
 summary_bar = summary_container.progress(0)
 
 st.subheader("A Priori Conversions")
-#todo: choose parametrization
 
 col1, col2 = st.columns(2)
 
@@ -203,7 +202,6 @@ with st.spinner(text=f'Running {n_simulations} simulations ...'):
         i = i + 1
         my_bar.progress(i / n_simulations)
         summary_bar.progress(i / n_simulations)
-        #todo: update spinner text if i % 10 == 0: st.spinner(text=f'finished {i} of {n_simulations} simulations')
 my_bar.empty()
 summary_bar.empty()
 
