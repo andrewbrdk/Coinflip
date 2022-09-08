@@ -71,8 +71,8 @@ st.title('Preliminary Duration Estimates')
 #todo: choose what to test: conversions, means, etc'
 summary_container = st.container()
 summary_container.write(f"""
-    Group A conversion: {st.session_state['prelim_a_mean']} +- {st.session_state['prelim_a_std']}%  
-    Expected group B conversion: {st.session_state['prelim_b_mean']} +- {st.session_state['prelim_b_std']}%    
+    Expected group A conversion: {st.session_state['prelim_a_mean']}%  
+    Expected group B conversion: {st.session_state['prelim_b_mean']}%    
       
     Daily users: {st.session_state['prelim_sim_daily_users']}  
     Group B traffic: {st.session_state['prelim_b_split']:.0f}%   
@@ -118,10 +118,10 @@ x = np.linspace(0, 1, 3001)
 fig = go.Figure()
 fig.add_trace(go.Scatter(x=x * 100, y=stats.beta.pdf(x, a_alpha, a_beta),
                          mode='lines',
-                         name=f"A: mean = {a_mean * 100} %, std = {(a_std * 100):.2f} %"))
+                         name=f"A: mean = {a_mean * 100:.1f} %, std = {(a_std * 100):.2f} %"))
 fig.add_trace(go.Scatter(x=x * 100, y=stats.beta.pdf(x, b_alpha, b_beta),
                          mode='lines',
-                         name=f"B: mean = {b_mean * 100} %, std = {(b_std * 100):.2f} %"))
+                         name=f"B: mean = {b_mean * 100:.1f} %, std = {(b_std * 100):.2f} %"))
 fig.update_layout(title='A Priori Conversions',
                   xaxis_title='Conversions, %',
                   yaxis_title='Prob Density',
