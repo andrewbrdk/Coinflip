@@ -197,6 +197,7 @@ df_formatted = df_summary[[]].copy()
 df_formatted['Total Users'] = df_summary['n_users'].astype(str)
 df_formatted['Converted Users'] = df_summary['conv'].astype(str)
 df_formatted['p, %'] = (df_summary['p'] * 100).round(1).astype(str)
+#todo: add 95HPDI interval p (lower - upper), %
 
 summary_bar.progress(0.1)
 #summary_container.write(df_formatted.T)
