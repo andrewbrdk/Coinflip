@@ -301,6 +301,47 @@ st.plotly_chart(fig)
 summary_bar.progress(0.6)
 
 
+widedf = df.set_index(['group', 'day']).unstack(level=0)
+widedf['pb_gt_pa'] = widedf.apply(lambda row: prob_pb_gt_pa(
+    p_a=row['p_accum']['A'],
+    p_b=row['p_accum']['B'],
+    N_a=row['n_users_accum']['A'], 
+    N_b=row['n_users_accum']['B']), axis=1)
+widedf = widedf.reset_index()
+df_summary['p_best_group'] = pd.Series({'A': (1 - widedf['pb_gt_pa'].iloc[-1]), 'B':widedf['pb_gt_pa'].iloc[-1]})
+
+
+fig = make_subplots(rows=1, cols=2, 
+                    column_widths=[0.85, 0.15],
+                    subplot_titles=("Daily", "Total"))
+fig.add_trace(go.Scatter(x=widedf.index, y=widedf['pb_gt_pa'],
+                         name='P(p_B > p_A)', marker_color='orange',
+                         opacity=0.6),
+              col=1, row=1)
+fig.add_hline(y=st.session_state['conv_pb_gt_pa_required'] / 100, line_dash="dash", col=1, row=1)
+fig.add_hline(y=1 - st.session_state['conv_pb_gt_pa_required'] / 100, line_dash="dash", col=1, row=1)
+for gr in df_summary.index.unique():
+    fig.add_trace(
+        go.Bar(x=[gr], y=[df_summary['p_best_group'][gr]],
+               name=gr,
+               marker_color=df_summary['col'][gr], width=0.3),
+        row=1, col=2)
+fig.update_layout(title_text='Certainty in Highest Conversion Group')
+fig.update_xaxes(title_text="Days", row=1, col=1)
+fig.update_yaxes(title_text="P(p_B > p_A)", row=1, col=1)
+fig.update_xaxes(title_text="Groups", row=1, col=2)
+fig.update_layout(yaxis_rangemode='tozero', yaxis2_rangemode='tozero')
+st.plotly_chart(fig)
+
+
+n_sample = 100000
+post_sample_a = posterior_sample_for_binom_and_uniform_prior(df_summary['conv']['A'], df_summary['n_users']['A'], n_sample)
+post_sample_b = posterior_sample_for_binom_and_uniform_prior(df_summary['conv']['B'], df_summary['n_users']['B'], n_sample)
+post_sample_rel = post_sample_b / post_sample_a
+#pb_gt_pa = np.sum(post_sample_b > post_sample_a) / n_sample
+#df_summary['p_best_group'] = pd.Series({'A': (1 - pb_gt_pa), 'B':pb_gt_pa})
+#display(widedf.head())
+
 fig = go.Figure()
 p_grid = np.linspace(start=0, stop=1, num=3001)
 xaxis_min = np.nan
@@ -325,28 +366,13 @@ fig.update_layout(title='Conversions Prob Density Estimates',
 st.plotly_chart(fig)
 
 
-n_sample = 100000
-post_sample_a = posterior_sample_for_binom_and_uniform_prior(df_summary['conv']['A'], df_summary['n_users']['A'], n_sample)
-post_sample_b = posterior_sample_for_binom_and_uniform_prior(df_summary['conv']['B'], df_summary['n_users']['B'], n_sample)
-post_sample_rel = post_sample_b / post_sample_a
-pb_gt_pa = np.sum(post_sample_b > post_sample_a) / n_sample
-df_summary['p_best_group'] = pd.Series({'A': (1 - pb_gt_pa), 'B':pb_gt_pa})
-
-fig = make_subplots(rows=1, cols=2, 
-                    column_widths=[0.85, 0.15],
-                    subplot_titles=("Relation", "Prob(Highest p)"))
-fig.add_trace(go.Histogram(x=post_sample_rel, histnorm='probability density', 
+fig = go.Figure()
+fig.add_trace(go.Histogram(x=post_sample_rel,
+                           histnorm='probability density',
                            name='B/A', marker_color='orange',
-                           opacity=0.6), 
-                           col=1, row=1)
-fig.add_vline(x=1, line_dash="dash", col=1, row=1)
-for gr in df_summary.index.unique():
-    fig.add_trace(
-        go.Bar(x=[gr], y=[df_summary['p_best_group'][gr]],
-               name=gr,
-               marker_color=df_summary['col'][gr], width=0.3),
-        row=1, col=2)
-fig.update_layout(title='Conversions Comparison',
+                           opacity=0.6))
+fig.add_vline(x=1, line_dash="dash")
+fig.update_layout(title='Conversions Relation',
                   xaxis_title='p_B / p_A',
                   yaxis_title='Prob Density',
                   barmode='overlay')
@@ -391,16 +417,7 @@ pb_gt_pa_required = st.session_state['conv_pb_gt_pa_required'] / 100
 
 
 
-widedf = df.set_index(['group', 'day']).unstack(level=0)
-#display(widedf.head())
 
-widedf['pb_gt_pa'] = widedf.apply(lambda row: prob_pb_gt_pa(
-    p_a=row['p_accum']['A'],
-    p_b=row['p_accum']['B'],
-    N_a=row['n_users_accum']['A'], 
-    N_b=row['n_users_accum']['B']), axis=1)
-widedf = widedf.reset_index()
-#display(widedf.head())
 
 
 
