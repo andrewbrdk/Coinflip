@@ -44,24 +44,24 @@ def beta_dist_mean_std_to_alpha_beta(mean, std):
     return alpha, beta
 
 def init_session_values():
-    if 'a_mean' not in st.session_state:
-        st.session_state['a_mean'] = 15.0
-    if 'a_std' not in st.session_state:
-        st.session_state['a_std'] = 0.1
-    if 'b_mean' not in st.session_state:
-        st.session_state['b_mean'] = 16.0
-    if 'b_std' not in st.session_state:
-        st.session_state['b_std'] = 1.0
-    if 'b_split' not in st.session_state:
-        st.session_state['b_split'] = 50.0
-    if 'pb_gt_pa_required' not in st.session_state:
-        st.session_state['pb_gt_pa_required'] = 95.0
-    if 'sim_max_days' not in st.session_state:
-        st.session_state['sim_max_days'] = 30
-    if 'sim_daily_users' not in st.session_state:
-        st.session_state['sim_daily_users'] = 5000
-    if 'n_simulations' not in st.session_state:
-        st.session_state['n_simulations'] = 100
+    if 'prelim_a_mean' not in st.session_state:
+        st.session_state['prelim_a_mean'] = 15.0
+    if 'prelim_a_std' not in st.session_state:
+        st.session_state['prelim_a_std'] = 0.1
+    if 'prelim_b_mean' not in st.session_state:
+        st.session_state['prelim_b_mean'] = 16.0
+    if 'prelim_b_std' not in st.session_state:
+        st.session_state['prelim_b_std'] = 1.0
+    if 'prelim_b_split' not in st.session_state:
+        st.session_state['prelim_b_split'] = 50.0
+    if 'prelim_pb_gt_pa_required' not in st.session_state:
+        st.session_state['prelim_pb_gt_pa_required'] = 95.0
+    if 'prelim_sim_max_days' not in st.session_state:
+        st.session_state['prelim_sim_max_days'] = 30
+    if 'prelim_sim_daily_users' not in st.session_state:
+        st.session_state['prelim_sim_daily_users'] = 5000
+    if 'prelim_n_simulations' not in st.session_state:
+        st.session_state['prelim_n_simulations'] = 100
         
 
 init_session_values()
@@ -71,11 +71,11 @@ st.title('Preliminary Duration Estimates')
 #todo: choose what to test: conversions, means, etc'
 summary_container = st.container()
 summary_container.write(f"""
-    Group A conversion: {st.session_state['a_mean']} +- {st.session_state['a_std']}%  
-    Expected group B conversion: {st.session_state['b_mean']} +- {st.session_state['b_std']}%    
+    Group A conversion: {st.session_state['prelim_a_mean']} +- {st.session_state['prelim_a_std']}%  
+    Expected group B conversion: {st.session_state['prelim_b_mean']} +- {st.session_state['prelim_b_std']}%    
       
-    Daily users: {st.session_state['sim_daily_users']}  
-    Group B traffic: {st.session_state['b_split']:.0f}%   
+    Daily users: {st.session_state['prelim_sim_daily_users']}  
+    Group B traffic: {st.session_state['prelim_b_split']:.0f}%   
 """)
 summary_bar = summary_container.progress(0)
 
@@ -89,12 +89,12 @@ with col1:
                     max_value=100.0,
                     step=0.1,
                     format='%f',
-                    key='a_mean')
+                    key='prelim_a_mean')
     st.number_input(label='A Std, %',
                     min_value=0.01,
                     step=0.01,
                     format='%f',
-                    key='a_std')
+                    key='prelim_a_std')
 
 with col2:
     st.number_input(label='B Mean, %',
@@ -102,15 +102,15 @@ with col2:
                     max_value=100.0,
                     step=0.1,
                     format='%f',
-                    key='b_mean')
+                    key='prelim_b_mean')
     st.number_input(label='B Std, %',
                     min_value=0.01,
                     step=0.01,
                     format='%f',
-                    key='b_std')
+                    key='prelim_b_std')
 
-a_mean, a_std = st.session_state['a_mean']/100, st.session_state['a_std']/100
-b_mean, b_std = st.session_state['b_mean']/100, st.session_state['b_std']/100
+a_mean, a_std = st.session_state['prelim_a_mean']/100, st.session_state['prelim_a_std']/100
+b_mean, b_std = st.session_state['prelim_b_mean']/100, st.session_state['prelim_b_std']/100
 a_alpha, a_beta = beta_dist_mean_std_to_alpha_beta(a_mean, a_std)
 b_alpha, b_beta = beta_dist_mean_std_to_alpha_beta(b_mean, b_std)
 
@@ -142,46 +142,46 @@ with col1:
                     min_value=100,
                     step=100,
                     format='%d',
-                    key='sim_daily_users')
+                    key='prelim_sim_daily_users')
 
     st.number_input(label='Max Days in Simulations',
                     min_value=1,
                     step=1,
                     format='%d',
-                    key='sim_max_days')
+                    key='prelim_sim_max_days')
 with col2:
     st.number_input(label='B Group Traffic, %',
                     min_value=0.0,
                     step=1.0,
                     format='%f',
-                    key='b_split')
+                    key='prelim_b_split')
 
     st.number_input(label='Simulations',
                     min_value=1,
                     step=1,
                     format='%d',
-                    key='n_simulations')
+                    key='prelim_n_simulations')
     
 st.number_input(label='Required Certainty, %',
                 min_value=0.0,
                 step=1.0,
                 format='%f',
-                key='pb_gt_pa_required')
+                key='prelim_pb_gt_pa_required')
 
-b_split = st.session_state['b_split'] / 100
-n_simulations = st.session_state['n_simulations']
-pb_gt_pa_required = st.session_state['pb_gt_pa_required'] / 100
+b_split = st.session_state['prelim_b_split'] / 100
+n_simulations = st.session_state['prelim_n_simulations']
+pb_gt_pa_required = st.session_state['prelim_pb_gt_pa_required'] / 100
 
-sim_max = st.session_state['sim_max_days'] * st.session_state['sim_daily_users']
-n_sim_steps = st.session_state['sim_max_days']
+sim_max = st.session_state['prelim_sim_max_days'] * st.session_state['prelim_sim_daily_users']
+n_sim_steps = st.session_state['prelim_sim_max_days']
 
 a_prior = stats.beta(a_alpha, a_beta)
 b_prior = stats.beta(b_alpha, b_beta)
 a_p_sim = a_prior.rvs(n_simulations)
 b_p_sim = b_prior.rvs(n_simulations)
 
-trials = np.append(0, np.full(fill_value=st.session_state['sim_daily_users'],
-                              shape=st.session_state['sim_max_days']))
+trials = np.append(0, np.full(fill_value=st.session_state['prelim_sim_daily_users'],
+                              shape=st.session_state['prelim_sim_max_days']))
 a_trials = np.rint(trials * (1 - b_split)).astype(int)
 b_trials = np.rint(trials * b_split).astype(int)
 
@@ -194,9 +194,9 @@ with st.spinner(text=f'Running {n_simulations} simulations ...'):
         s['A'] = simulate(a_p, a_trials, a_alpha, a_beta)
         s['B'] = simulate(b_p, b_trials, b_alpha, b_beta)
         s['pb_ge_pa'] = pb_ge_pa_sims(s['A'], s['B'], n_cmp=10000)
-        s['days'] = np.arange(st.session_state['sim_max_days'] + 1)
+        s['days'] = np.arange(st.session_state['prelim_sim_max_days'] + 1)
         s['N'] = s['A']['trials_accum'] + s['B']['trials_accum']
-        s['pb_gt_pa_required'] = st.session_state['pb_gt_pa_required'] / 100
+        s['pb_gt_pa_required'] = st.session_state['prelim_pb_gt_pa_required'] / 100
         s['min_days_to_reach_certainty_lvl'] = min_days_to_reach_certainty_level(s['pb_ge_pa'], s['days'], s['pb_gt_pa_required'])
         sims.append(s)
         i = i + 1
@@ -214,7 +214,7 @@ else:
     summary_line = f"50% simulations reached {pb_gt_pa_required*100:.0f}% certainty at day {x_med:.0f} or earlier"
 
 summary_container.write(f"""
-    Required certainty: {st.session_state['pb_gt_pa_required']}%  
+    Required certainty: {st.session_state['prelim_pb_gt_pa_required']}%  
     {summary_line}
 """)
 
@@ -235,7 +235,7 @@ fig.update_layout(title=f'Days to Reach {pb_gt_pa_required*100:.0f}% Certainty')
 fig.update_layout(xaxis_title='Days',
                   yaxis_title='Part from Total Simulations',
                   showlegend=False)
-fig.update_xaxes(range=[0, st.session_state['sim_max_days'] + 1])
+fig.update_xaxes(range=[0, st.session_state['prelim_sim_max_days'] + 1])
 fig.update_layout(yaxis_rangemode='tozero')
 st.plotly_chart(fig)
 
