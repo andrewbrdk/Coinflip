@@ -212,8 +212,10 @@ if len(n_reached_freqs['freq']) == 1:
     summary_line = f"100% simulations reached certainty at day {n_reached_freqs.index[0]}"
 else:
     summary_line = f"50% simulations reached {pb_gt_pa_required*100:.0f}% certainty at day {x_med:.0f} or earlier"
+prior_pb_gt_pa = sims[0]['pb_ge_pa'][0] #simplify
 
 summary_container.write(f"""
+    Prior P(p_B > p_A): {prior_pb_gt_pa * 100:.1f}%    
     Required certainty: {st.session_state['prelim_pb_gt_pa_required']}%  
     {summary_line}
 """)
