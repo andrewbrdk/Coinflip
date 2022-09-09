@@ -103,7 +103,7 @@ def init_conv_session_values():
     if 'conv_daily_users' not in st.session_state:
         st.session_state['conv_daily_users'] = 3000
     if 'conv_n_days' not in st.session_state:
-        st.session_state['conv_n_days'] = 15
+        st.session_state['conv_n_days'] = 10
     if 'conv_b_split' not in st.session_state:
         st.session_state['conv_b_split'] = 50.0
     if 'conv_pb_gt_pa_required' not in st.session_state:
@@ -196,8 +196,6 @@ df_summary['col'] = pd.Series({'A': 'red', 'B':'blue'})
 df_formatted = df_summary[[]].copy()
 df_formatted['Total Users'] = df_summary['n_users'].astype(str)
 df_formatted['Converted Users'] = df_summary['conv'].astype(str)
-df_formatted['p, %'] = (df_summary['p'] * 100).round(1).astype(str)
-#todo: add 95HPDI interval p (lower - upper), %
 
 summary_bar.progress(0.1)
 #summary_container.write(df_formatted.T)
@@ -257,13 +255,15 @@ df = pd.concat([df, df_accum], axis=1)
 df['p_accum'] = df['conv_accum'] / df['n_users_accum']
 
 with st.spinner(text=f'Computing Conversions Interval Estimates ...'):
-    hpdi = 0.9
+    hpdi = 0.95
     df[['p_hpdi_lower','p_hpdi_higher']] = df.apply(lambda row: pd.Series(hpdi_for_binom_and_uniform_prior(hpdi, row['conv_accum'], row['n_users_accum'])), axis=1)
     df['error_lower'] = df['p_accum'] - df['p_hpdi_lower']
     df['error_higher'] = df['p_hpdi_higher'] - df['p_accum']
 
 df_plot = df.set_index('group')
 df_summary[['p_error_lower', 'p_error_higher']] = df_plot[['error_lower', 'error_higher']][df_plot['day'] == df_plot['day'].max()]
+df_summary[['p_hpdi_lower', 'p_hpdi_higher']] = df_plot[['p_hpdi_lower', 'p_hpdi_higher']][df_plot['day'] == df_plot['day'].max()]
+
 
 fig = make_subplots(rows=1, cols=2,
                     shared_yaxes=True,
@@ -291,7 +291,6 @@ for gr in df_plot.index.unique():
                             'arrayminus': [df_summary['p_error_lower'][gr]]},
                    name=gr),
         row=1, col=2)
-
 fig.update_layout(title_text='Accumulated Conversions')
 fig.update_xaxes(title_text="Days", row=1, col=1)
 fig.update_yaxes(title_text="Conversions", row=1, col=1)
@@ -314,7 +313,7 @@ df_summary['p_best_group'] = pd.Series({'A': (1 - widedf['pb_gt_pa'].iloc[-1]), 
 
 fig = make_subplots(rows=1, cols=2, 
                     column_widths=[0.85, 0.15],
-                    subplot_titles=("Daily", "Total"))
+                    subplot_titles=("Daily Accumulated", "Total"))
 fig.add_trace(go.Scatter(x=widedf.index, y=widedf['pb_gt_pa'],
                          name='P(p_B > p_A)', marker_color='orange',
                          opacity=0.6),
@@ -380,14 +379,16 @@ fig.update_layout(title='Conversions Relation',
 st.plotly_chart(fig)
 
 
-
+df_formatted['Mean Conversion, %'] = np.round(df_summary['p'] * 100, 1).astype(str)
+#df_formatted['Conversion 95HPDI, %'] = df_summary.apply(lambda row: f"{row['p_hpdi_lower'] * 100 :.1f} - {row['p_hpdi_higher'] * 100:.1f}", axis=1)
+#df_formatted['p (95 HPDI), %'] = df_summary.apply(lambda row: f"{row['p'] * 100 :.1f} ({row['p_hpdi_lower'] * 100 :.1f} - {row['p_hpdi_higher'] * 100:.1f})", axis=1)
 df_formatted['Relative to A'] = pd.Series({'A':1.0, 'B':np.mean(post_sample_rel).round(2)}).astype(str)
 summary_bar.progress(0.8)
 
-df_formatted['Prob(Highest p), %'] = np.round(df_summary['p_best_group'] * 100, 1).astype(str)
+df_formatted['Prob(Highest Conversion), %'] = np.round(df_summary['p_best_group'] * 100, 1).astype(str)
 summary_bar.progress(1)
 summary_bar.empty()
-summary_container.write(df_formatted.T, width=600)
+summary_container.table(df_formatted.T)
 
 
 st.subheader("Duration Estimates")
